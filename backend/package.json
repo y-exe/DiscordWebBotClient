@@ -1,0 +1,23 @@
+{
+  "name": "discordwebtokenclient-backend",
+  "version": "1.0.0",
+  "description": "",
+  "main": "server.js",
+  "scripts": {
+    "start": "bun server.js",
+    "audit:production": "bun audit",
+    "test:security": "bun test tests/",
+    "dev": "bun --watch server.js"
+  },
+  "keywords": [],
+  "author": "",
+  "type": "commonjs",
+  "dependencies": {
+    "@hono/node-server": "^1.13.7",
+    "discord.js": "^14.27.0",
+    "discord.js-selfbot-youtsuho-v13": "^3.7.8",
+    "dotenv": "^17.2.3",
+    "hono": "^4.7.5",
+    "socket.io": "^4.8.3"
+  }
+}

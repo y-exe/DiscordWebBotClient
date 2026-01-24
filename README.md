@@ -1,0 +1,97 @@
+﻿<div align="center">
+<h1>
+  Discord Web Token Client
+  
+  [![discord.js-selfbot](https://img.shields.io/badge/discord.js--selfbot-5865F2?style=flat-square&logo=discord&logoColor=white)](https://github.com/youtsuhodev/discord.js-selfbot-youtsuho-v13)
+  [![Next.js](https://img.shields.io/badge/Next.js-000000?style=flat-square&logo=next.js)](https://nextjs.org/)
+  [![Hono](https://img.shields.io/badge/Hono-ff6000?style=flat-square&logo=hono&logoColor=white)](https://hono.dev/)
+  [![Licence GPL v3](https://img.shields.io/badge/Licence-GPL%20v3-green.svg?style=flat-square)](LICENSE)
+</h1>
+Socket.io と discord.js-selfbot を使用した、WEB 上のオリジナル Discord クライアント!<br>
+Bot トークンおよびユーザー個人トークンにも一応対応しています。<br>
+<br>
+
+<table>
+  <tr>
+    <td align="center" width="50%">
+      <img src="public/1.png" alt="ログイン画面">
+      <br>
+      <sub>ログイン画面</sub>
+    </td>
+    <td align="center" width="50%">
+      <img src="public/2.png" alt="アプリ画面(Web)">
+      <br>
+      <sub>アプリ画面(Web)</sub>
+    </td>
+  </tr>
+</table>
+</div>
+<br/>
+
+## なんのためにつくった...?
+
+フィルタリング回避が主な目的ではあるが、  
+ついでに超重いWeb版Discordをどうにかしたかったのと、Web版でBotClientを使えるようにしたかった等...  
+基本使う必要ないサイトだと思います。自分用。
+
+
+## 特徴など...
+
+- **高速・軽量**: Socket.io によるリアルタイム通信
+- **マルチデバイス**: PC およびスマホ表示対応
+- **多機能対応**: DM/グループDM/フォーラム/スレッド 等にも対応
+- **メッセージ操作**: 返信、リアクション、スラッシュコマンド(オプション入力付き)などに対応
+
+- **非対応**: VC(ボイスチャンネルへの参加)。私用サイトですがよければPullください
+
+
+## ドキュメント
+
+詳細は [docs/](docs/README.md) を参照してください。
+
+| カテゴリ | 内容 |
+|---|---|
+| [Operations](docs/operations/setup.md) | セットアップ・環境変数・起動・デプロイ |
+| [Guide](docs/guide/usage.md) | 使い方・設定画面 |
+| [Development](docs/development/architecture.md) | アーキテクチャ・テスト |
+
+## ディレクトリ構造
+
+```
+/frontend  Next.js + Tailwind CSS (ほぼMaterial3Expressive)
+/backend   Bun + Hono + Socket.io
+/docs      設計・構成・使い方のドキュメント
+```
+
+## 免責事項
+
+このプロジェクトにはセルフボットを利用しております。
+> [!WARNING]
+> 本プロジェクトでユーザー名義のトークンを使用することは、Discord 公式のサービス利用規約に違反する可能性があります。
+> 本サービスの利用によりアカウントが停止、削除、または制限された場合でも、開発者は一切の責任を負いません。
+> すべて自己責任において利用してください。
+
+## 開発ツール
+
+Bun 1.3.14、Biome、Turborepoを使用します。
+
+```bash
+bun run bootstrap
+bun run dev
+```
+
+| コマンド | 内容 |
+|---|---|
+| `bun run check` | lint・セキュリティテスト |
+| `bun run build` | フロントエンドのビルド |
+| `bun run lint:react` | React用ESLint検査 |
+| `bun run format` | コード整形 |
+
+Cloudflare用ビルドは `frontend/` で `npm run build` を実行します。依存変更時は、Bunとnpm/Docker用のロックファイルを更新してください。
+
+## ライセンス
+
+[GPL-3.0](LICENSE)
+
+---
+© 2026 yexe.xyz
