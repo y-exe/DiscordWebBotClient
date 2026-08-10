@@ -3,28 +3,18 @@ import { Routes, Route, useNavigate, Navigate, useLocation } from 'react-router-
 import { io } from 'socket.io-client';
 import { ThemeProvider } from 'next-themes'; 
 import { API_URL } from './utils/helpers';
+import {
+  clearPendingLogin,
+  commitPendingLogin,
+  loadAccountHistory,
+  refreshStoredAccount,
+  saveAccountHistory,
+} from './utils/tokenVault';
 
 const Login = lazy(() => import('./components/auth/Login'));
 const Terms = lazy(() => import('./components/legal/Terms'));
 const Privacy = lazy(() => import('./components/legal/Privacy'));
 const DiscordClient = lazy(() => import('./components/DiscordClient'));
-
-const setCookie = (name, value, days) => {
-  const expires = new Date(Date.now() + days * 864e5).toUTCString();
-  document.cookie = name + '=' + encodeURIComponent(JSON.stringify(value)) + '; expires=' + expires + '; path=/';
-};
-
-const getCookie = (name) => {
-  const value = document.cookie.split('; ').reduce((result, entry) => {
-    const parts = entry.split('=');
-    return parts[0] === name ? decodeURIComponent(parts.slice(1).join('=')) : result;
-  }, '');
-  try {
-    return JSON.parse(value || '[]');
-  } catch {
-    return [];
-  }
-};
 
 let globalSocket = null;
 
@@ -42,14 +32,14 @@ const RequireAuth = ({ children }) => {
             sessionStorage.removeItem('current-session');
         }
 
-        if (!session) {
-            const history = getCookie('discord-client-history');
-            if (Array.isArray(history) && history.length > 0 && history[0].token) {
-                session = { token: history[0].token, isBot: history[0].isBot };
+        if (!session || !Number.isInteger(session.slot)) {
+            const history = loadAccountHistory();
+            if (history.length > 0) {
+                session = { slot: history[0].slot, isBot: history[0].isBot, pending: false };
             }
         }
 
-        if (!session || !session.token) {
+        if (!session || !Number.isInteger(session.slot)) {
             navigate('/login', { replace: true });
             return;
         }
@@ -57,26 +47,41 @@ const RequireAuth = ({ children }) => {
         if (!globalSocket) {
             globalSocket = io(API_URL, { 
                 transports: ['websocket'],
+                withCredentials: true,
                 reconnection: true 
             });
 
             globalSocket.on('connect', () => { 
-                globalSocket.emit('login', { token: session.token, isBot: session.isBot }); 
+                globalSocket.emit('login', { slot: session.slot, pending: session.pending === true });
             });
 
-            globalSocket.on('login-success', ({ user: userData }) => { 
-                setUser(userData);
-                setIsReady(true);
-                const currentHistory = getCookie('discord-client-history');
-                const safeHistory = Array.isArray(currentHistory) ? currentHistory : [];
-                const newHistory = [
-                    { token: session.token, isBot: session.isBot === true, ...userData },
-                    ...safeHistory.filter((item) => item.token !== session.token),
-                ].slice(0, 5);
-                setCookie('discord-client-history', newHistory, 365);
+            globalSocket.on('login-success', async ({ user: userData, isBot }) => {
+                try {
+                    const currentHistory = loadAccountHistory();
+                    const existing = currentHistory.find((item) => item.id === userData.id && item.isBot === isBot);
+                    const slot = existing?.slot ?? session.slot;
+                    if (session.pending === true) await commitPendingLogin(slot);
+                    else await refreshStoredAccount(slot);
+                    const newHistory = [
+                        { slot, isBot, ...userData },
+                        ...currentHistory.filter((item) => item.slot !== slot && item.id !== userData.id),
+                    ].slice(0, 5);
+                    saveAccountHistory(newHistory);
+                    session = { slot, isBot, pending: false };
+                    sessionStorage.setItem('current-session', JSON.stringify(session));
+                    setUser(userData);
+                    setIsReady(true);
+                } catch (error) {
+                    console.error('Could not persist the login session:', error);
+                    sessionStorage.removeItem('current-session');
+                    globalSocket?.disconnect();
+                    globalSocket = null;
+                    navigate('/login', { replace: true });
+                }
             });
 
             globalSocket.on('login-error', () => {
+                if (session.pending === true) clearPendingLogin().catch(() => {});
                 sessionStorage.removeItem('current-session');
                 globalSocket.disconnect();
                 globalSocket = null;
@@ -84,7 +89,7 @@ const RequireAuth = ({ children }) => {
             });
         } else {
             if (globalSocket.connected) {
-                globalSocket.emit('login', { token: session.token, isBot: session.isBot });
+                globalSocket.emit('login', { slot: session.slot, pending: session.pending === true });
             }
         }
 

@@ -39,7 +39,9 @@ const isAllowedOrigin = (origin) => {
 
 const corsOptions = {
     origin(origin, callback) { callback(null, isAllowedOrigin(origin)); },
-    methods: ['GET', 'OPTIONS'],
+    methods: ['GET', 'POST', 'DELETE', 'OPTIONS'],
+    allowedHeaders: ['Content-Type'],
+    credentials: true,
     maxAge: 86400
 };
 
@@ -55,6 +57,7 @@ app.use(helmet({
     }
 }));
 app.use(cors(corsOptions));
+app.use(express.json({ limit: '4kb' }));
 const server = http.createServer(app);
 const io = new Server(server, {
     cors: corsOptions,
@@ -66,6 +69,124 @@ const io = new Server(server, {
 
 const sessions = new Map();
 const loginQueue = new Set();
+
+const ACCOUNT_COOKIE_COUNT = 5;
+const ACCOUNT_COOKIE_MAX_AGE = 365 * 24 * 60 * 60 * 1000;
+const PENDING_COOKIE_MAX_AGE = 10 * 60 * 1000;
+const cookiePrefix = IS_PRODUCTION ? '__Host-dwtc-' : 'dwtc-';
+const accountCookieName = (slot) => `${cookiePrefix}account-${slot}`;
+const pendingCookieName = `${cookiePrefix}pending`;
+const cookieOptions = (maxAge) => ({
+    httpOnly: true,
+    secure: IS_PRODUCTION,
+    sameSite: 'strict',
+    path: '/',
+    maxAge,
+});
+const clearCookieOptions = {
+    httpOnly: true,
+    secure: IS_PRODUCTION,
+    sameSite: 'strict',
+    path: '/',
+};
+const parseCookieHeader = (header = '') => {
+    const cookies = new Map();
+    for (const part of header.split(';')) {
+        const separator = part.indexOf('=');
+        if (separator < 1) continue;
+        const name = part.slice(0, separator).trim();
+        const rawValue = part.slice(separator + 1).trim();
+        try { cookies.set(name, decodeURIComponent(rawValue)); } catch { }
+    }
+    return cookies;
+};
+const encodeCredentialCookie = (token, isBot) => Buffer
+    .from(JSON.stringify({ token, isBot: isBot === true }), 'utf8')
+    .toString('base64url');
+const decodeCredentialCookie = (value) => {
+    if (typeof value !== 'string' || value.length > 1024) return null;
+    try {
+        const parsed = JSON.parse(Buffer.from(value, 'base64url').toString('utf8'));
+        const token = typeof parsed.token === 'string' ? parsed.token.trim() : '';
+        if (!token || token.length > 512 || /[\r\n\0]/.test(token)) return null;
+        return { token, isBot: parsed.isBot === true };
+    } catch {
+        return null;
+    }
+};
+const readCredentialCookie = (header, name) => decodeCredentialCookie(parseCookieHeader(header).get(name));
+const parseAccountSlot = (value) => {
+    const slot = Number(value);
+    return Number.isInteger(slot) && slot >= 0 && slot < ACCOUNT_COOKIE_COUNT ? slot : null;
+};
+const credentialFromBody = (body = {}) => {
+    const token = typeof body.token === 'string' ? body.token.trim() : '';
+    if (!token || token.length > 512 || /[\r\n\0]/.test(token)) return null;
+    return { token, isBot: body.isBot === true };
+};
+const authCookieLimiter = rateLimit({ windowMs: 60_000, limit: 30, standardHeaders: 'draft-8', legacyHeaders: false });
+const requireAllowedAuthOrigin = (req, res, next) => {
+    if (!isAllowedOrigin(req.get('origin'))) return res.status(403).json({ error: 'Origin not allowed' });
+    res.setHeader('Cache-Control', 'no-store');
+    return next();
+};
+
+app.use('/api/auth', authCookieLimiter, requireAllowedAuthOrigin);
+
+app.post('/api/auth/pending', (req, res) => {
+    const credential = credentialFromBody(req.body);
+    if (!credential) return res.status(400).json({ error: 'Invalid credentials' });
+    res.cookie(pendingCookieName, encodeCredentialCookie(credential.token, credential.isBot), cookieOptions(PENDING_COOKIE_MAX_AGE));
+    return res.status(204).end();
+});
+
+app.delete('/api/auth/pending', (req, res) => {
+    res.clearCookie(pendingCookieName, clearCookieOptions);
+    return res.status(204).end();
+});
+
+app.post('/api/auth/accounts/:slot', (req, res) => {
+    const slot = parseAccountSlot(req.params.slot);
+    const credential = credentialFromBody(req.body);
+    if (slot === null || !credential) return res.status(400).json({ error: 'Invalid account' });
+    res.cookie(accountCookieName(slot), encodeCredentialCookie(credential.token, credential.isBot), cookieOptions(ACCOUNT_COOKIE_MAX_AGE));
+    return res.status(204).end();
+});
+
+app.post('/api/auth/accounts/:slot/commit', (req, res) => {
+    const slot = parseAccountSlot(req.params.slot);
+    const pendingValue = parseCookieHeader(req.headers.cookie).get(pendingCookieName);
+    const credential = decodeCredentialCookie(pendingValue);
+    if (slot === null || !credential) return res.status(400).json({ error: 'Pending login not found' });
+    res.cookie(accountCookieName(slot), pendingValue, cookieOptions(ACCOUNT_COOKIE_MAX_AGE));
+    res.clearCookie(pendingCookieName, clearCookieOptions);
+    return res.status(204).end();
+});
+
+app.post('/api/auth/accounts/:slot/refresh', (req, res) => {
+    const slot = parseAccountSlot(req.params.slot);
+    const cookieName = slot === null ? null : accountCookieName(slot);
+    const value = cookieName ? parseCookieHeader(req.headers.cookie).get(cookieName) : null;
+    const credential = decodeCredentialCookie(value);
+    if (slot === null || !credential) return res.status(400).json({ error: 'Saved account not found' });
+    res.cookie(cookieName, value, cookieOptions(ACCOUNT_COOKIE_MAX_AGE));
+    return res.status(204).end();
+});
+
+app.delete('/api/auth/accounts/:slot', (req, res) => {
+    const slot = parseAccountSlot(req.params.slot);
+    if (slot === null) return res.status(400).json({ error: 'Invalid account' });
+    res.clearCookie(accountCookieName(slot), clearCookieOptions);
+    return res.status(204).end();
+});
+
+app.delete('/api/auth/accounts', (req, res) => {
+    for (let slot = 0; slot < ACCOUNT_COOKIE_COUNT; slot += 1) {
+        res.clearCookie(accountCookieName(slot), clearCookieOptions);
+    }
+    res.clearCookie(pendingCookieName, clearCookieOptions);
+    return res.status(204).end();
+});
 
 const IMAGE_PROXY_HOSTS = new Set(
     (process.env.IMAGE_PROXY_HOSTS || 'cdn.discordapp.com,media.discordapp.net,images-ext-1.discordapp.net,images-ext-2.discordapp.net')
@@ -470,11 +591,13 @@ io.on('connection', (socket) => {
     socket.on('error', (error) => console.warn(`[Socket] ${socket.id}: ${error.message}`));
 
     socket.on('login', async (credentials = {}) => {
-        const token = typeof credentials.token === 'string' ? credentials.token.trim() : '';
-        const isBot = credentials.isBot === true;
-        if (!token || token.length > 512 || /[\r\n\0]/.test(token)) {
+        const slot = parseAccountSlot(credentials.slot);
+        const cookieName = credentials.pending === true ? pendingCookieName : (slot === null ? null : accountCookieName(slot));
+        const credential = cookieName ? readCredentialCookie(socket.handshake.headers.cookie, cookieName) : null;
+        if (!credential) {
             return socket.emit('login-error', 'Invalid credentials');
         }
+        const { token, isBot } = credential;
         if (sessions.has(socket.id) || loginQueue.has(socket.id)) return;
 
         loginQueue.add(socket.id);
@@ -497,6 +620,7 @@ io.on('connection', (socket) => {
             console.log(`[Auth] Ready: ${client.user.tag}`);
             sessions.set(socket.id, client);
             socket.emit('login-success', {
+                isBot: !!client.user.bot,
                 user: {
                     id: client.user.id,
                     username: client.user.username,

@@ -1,6 +1,5 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { motion as Motion, AnimatePresence } from 'framer-motion';
-import { useNavigate } from 'react-router-dom';
 import MouseEffectCard from '../ui/MouseEffectCard';
 import { InteractiveHoverButton } from '../ui/InteractiveHoverButton';
 import { FaUser, FaRobot, FaDiscord, FaTrash, FaQuestionCircle, FaTimes, FaArrowRight, FaHistory } from 'react-icons/fa';
@@ -8,23 +7,15 @@ import Header from './Header';
 import Footer from './Footer';
 import { NativeDelete } from '../ui/NativeDelete';
 import Head from '../seo/Head';
-
-const setCookie = (name, value, days) => {
-  const expires = new Date(Date.now() + days * 864e5).toUTCString();
-  document.cookie = name + '=' + encodeURIComponent(JSON.stringify(value)) + '; expires=' + expires + '; path=/';
-};
-
-const getCookie = (name) => {
-  const value = document.cookie.split('; ').reduce((result, entry) => {
-    const parts = entry.split('=');
-    return parts[0] === name ? decodeURIComponent(parts.slice(1).join('=')) : result;
-  }, '');
-  try {
-    return JSON.parse(value || '[]');
-  } catch {
-    return [];
-  }
-};
+import {
+  chooseAccountSlot,
+  deleteAllStoredAccounts,
+  deleteStoredAccount,
+  loadAccountHistory,
+  migrateLegacyAccounts,
+  saveAccountHistory,
+  stagePendingLogin,
+} from '../../utils/tokenVault';
 
 const containerVariants = { 
   hidden: { opacity: 0 }, 
@@ -36,31 +27,67 @@ const itemVariants = {
 };
 
 export default function Login() {
-  const navigate = useNavigate();
   const [userToken, setUserToken] = useState("");
   const [botToken, setBotToken] = useState("");
-  const [history, setHistory] = useState(() => {
-    const savedHistory = getCookie('discord-client-history');
-    return Array.isArray(savedHistory) ? savedHistory : [];
-  });
+  const [history, setHistory] = useState(loadAccountHistory);
   const [showTokenHelp, setShowTokenHelp] = useState(false);
+  const [loginError, setLoginError] = useState('');
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
-  const handleLogin = (token, isBot) => {
-    if (!token.trim()) return;
-    sessionStorage.setItem('current-session', JSON.stringify({ token: token.trim(), isBot }));
-    navigate('/@me');
+  useEffect(() => {
+    let cancelled = false;
+    migrateLegacyAccounts()
+      .then((migratedHistory) => {
+        if (!cancelled) setHistory(migratedHistory);
+      })
+      .catch((error) => {
+        console.error('Could not migrate the legacy login history:', error);
+      });
+    return () => { cancelled = true; };
+  }, []);
+
+  const handleLogin = async (token, isBot) => {
+    const cleanToken = token.trim();
+    if (!cleanToken || isSubmitting) return;
+    setIsSubmitting(true);
+    setLoginError('');
+    try {
+      const slot = chooseAccountSlot(history);
+      await stagePendingLogin(cleanToken, isBot);
+      sessionStorage.setItem('current-session', JSON.stringify({ slot, isBot, pending: true }));
+      window.location.assign('/@me');
+    } catch (error) {
+      console.error('Could not start login:', error);
+      setLoginError('ログイン情報を安全に保存できませんでした。しばらくしてから再試行してください。');
+      setIsSubmitting(false);
+    }
   };
 
-  const deleteHistory = (e, index) => {
+  const handleSavedLogin = (account) => {
+    sessionStorage.setItem('current-session', JSON.stringify({ slot: account.slot, isBot: account.isBot, pending: false }));
+    window.location.assign('/@me');
+  };
+
+  const deleteHistory = async (e, account) => {
     e.stopPropagation();
-    const newHistory = history.filter((_, i) => i !== index);
-    setHistory(newHistory);
-    setCookie('discord-client-history', newHistory, 365);
+    try {
+      await deleteStoredAccount(account.slot);
+      const newHistory = saveAccountHistory(history.filter((item) => item.slot !== account.slot));
+      setHistory(newHistory);
+    } catch (error) {
+      console.error('Could not delete the saved account:', error);
+      setLoginError('保存済みアカウントを削除できませんでした。');
+    }
   };
   
-  const deleteAllHistory = () => {
-    setHistory([]);
-    setCookie('discord-client-history', [], 365);
+  const deleteAllHistory = async () => {
+    try {
+      await deleteAllStoredAccounts();
+      setHistory(saveAccountHistory([]));
+    } catch (error) {
+      console.error('Could not clear saved accounts:', error);
+      setLoginError('ログイン履歴を削除できませんでした。');
+    }
   };
 
   return (
@@ -87,6 +114,8 @@ export default function Login() {
                     </Motion.p>
                 </div>
 
+                {loginError && <p role="alert" className="mb-6 text-sm font-bold text-red-500">{loginError}</p>}
+
                 {history.length > 0 && (
                     <Motion.div variants={itemVariants} className="w-full max-w-4xl mb-10 bg-white/90 dark:bg-zinc-900/90 backdrop-blur-sm border border-gray-200 dark:border-zinc-800 rounded-2xl shadow-lg p-6">
                         <div className="flex items-center justify-between gap-3 mb-4">
@@ -95,10 +124,10 @@ export default function Login() {
                         </div>
                         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
                             {history.map((item, i) => (
-                                <div key={item.id || i} onClick={() => handleLogin(item.token, item.isBot)} className="relative bg-gray-50 dark:bg-zinc-800 border border-gray-200 dark:border-zinc-700 rounded-xl p-3 flex items-center gap-3 cursor-pointer hover:shadow-md hover:-translate-y-0.5 transition-all overflow-hidden group">
+                                <div key={item.id || i} onClick={() => handleSavedLogin(item)} className="relative bg-gray-50 dark:bg-zinc-800 border border-gray-200 dark:border-zinc-700 rounded-xl p-3 flex items-center gap-3 cursor-pointer hover:shadow-md hover:-translate-y-0.5 transition-all overflow-hidden group">
                                     <div className="relative shrink-0"><img src={item.avatar || "https://cdn.discordapp.com/embed/avatars/0.png"} className="w-10 h-10 rounded-full object-cover bg-gray-200 dark:bg-zinc-700" alt={item.username || "User"} /><div className={`absolute -bottom-1 -right-1 w-4 h-4 rounded-full border-2 border-gray-50 dark:border-zinc-800/50 flex items-center justify-center text-[7px] ${item.isBot ? 'bg-[#5865F2]' : 'bg-gray-600'} text-white shadow-sm`}>{item.isBot ? <FaRobot /> : <FaUser />}</div></div>
                                     <div className="flex-1 min-w-0 text-left"><div className="font-bold text-gray-900 dark:text-gray-100 truncate text-sm">{item.username || "Unknown"}</div><div className="text-[10px] text-gray-500 dark:text-gray-400 font-mono truncate max-w-full">ID: {item.id}</div></div>
-                                    <button onClick={(e) => deleteHistory(e, i)} className="text-gray-400 hover:text-red-500 dark:text-zinc-600 dark:hover:text-red-400 transition-colors p-2 opacity-100 absolute top-1 right-1 z-10" title="履歴から削除"><FaTrash size={12} /></button>
+                                    <button onClick={(e) => deleteHistory(e, item)} className="text-gray-400 hover:text-red-500 dark:text-zinc-600 dark:hover:text-red-400 transition-colors p-2 opacity-100 absolute top-1 right-1 z-10" title="履歴から削除"><FaTrash size={12} /></button>
                                 </div>
                             ))}
                         </div>

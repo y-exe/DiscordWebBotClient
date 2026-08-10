@@ -185,7 +185,7 @@ const SettingsPage = ({ page, user, settings, update, onReset }) => {
 
   if (page === 'keybinds') return <div className="settings-page"><div className="settings-category-button-group"><KeybindRow action="設定を開く" keys="Ctrl + ," /><KeybindRow action="メッセージ入力へ移動" keys="Ctrl + K" /><KeybindRow action="設定・オーバーレイを閉じる" keys="Esc" /></div></div>;
 
-  if (page === 'privacy') return <div className="settings-page"><Section title="セッションとデータ"><p className="settings-card-description">設定値はこのブラウザーの localStorage にのみ保存されます。トークンは既存のセッション管理を使い、設定画面から外部へ送信しません。</p></Section></div>;
+  if (page === 'privacy') return <div className="settings-page"><Section title="セッションとデータ"><p className="settings-card-description">設定値とアカウントの表示情報はこのブラウザーの localStorage に保存されます。トークンはJavaScriptから読み取れないHttpOnly Cookieに保存され、バックエンドのDBやファイルには保存されません。</p></Section></div>;
 
   return (
     <div className="settings-page">
