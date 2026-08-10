@@ -1,3 +1,5 @@
+import { openExternalUrl } from '../../utils/security';
+
 const MessageComponent = ({ components, onClick }) => {
   if (!components || components.length === 0) return null;
 
@@ -11,7 +13,7 @@ const MessageComponent = ({ components, onClick }) => {
 
               if (isLink) {
                 return (
-                  <md-outlined-button key={j} type="button" onClick={() => window.open(comp.url, '_blank', 'noreferrer')}>
+                  <md-outlined-button key={j} type="button" onClick={() => openExternalUrl(comp.url)}>
                     {comp.label}
                   </md-outlined-button>
                 );
@@ -27,7 +29,7 @@ const MessageComponent = ({ components, onClick }) => {
                 </md-filled-tonal-button>
               );
             }
-            return null; // Other components (Select Menu etc) omitted for now
+            return null;
           })}
         </div>
       ))}

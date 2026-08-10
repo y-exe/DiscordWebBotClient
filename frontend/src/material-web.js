@@ -10,6 +10,7 @@ import '@material/web/iconbutton/filled-tonal-icon-button.js';
 import '@material/web/list/list.js';
 import '@material/web/list/list-item.js';
 import '@material/web/menu/menu.js';
+import '@material/web/progress/linear-progress.js';
 import '@material/web/ripple/ripple.js';
 import '@material/web/select/outlined-select.js';
 import '@material/web/select/select-option.js';

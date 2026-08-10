@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { FaCopy, FaHashtag, FaLink, FaPen, FaPlus, FaReply, FaTrash } from 'react-icons/fa6';
-import twemoji from 'twemoji';
+import TwemojiText from '../ui/TwemojiText';
 
 const cp = (...points) => String.fromCodePoint(...points);
 const DEFAULT_EMOJIS = [cp(0x1f44d), cp(0x2705), cp(0x1f495), cp(0x1f914)];
@@ -50,7 +50,7 @@ const MessageContextMenu = ({
           {frequentEmojis.map((emoji) => (
             <button type="button" key={emoji} className="app-context-emoji" onClick={() => react(emoji)} title={emoji}>
               <md-ripple />
-              <span dangerouslySetInnerHTML={{ __html: twemoji.parse(emoji, { folder: 'svg', ext: '.svg' }) }} />
+              <TwemojiText>{emoji}</TwemojiText>
             </button>
           ))}
         </div>

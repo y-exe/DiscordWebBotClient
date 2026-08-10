@@ -1,9 +1,9 @@
 import { useMemo, useState } from 'react';
 import { FaNoteSticky } from 'react-icons/fa6';
-import twemoji from 'twemoji';
 import { DEFAULT_EMOJIS } from '../../utils/emojis';
 import { getProxyUrl } from '../../utils/helpers';
 import { getStickerUrl, isLottieSticker } from '../../utils/stickers';
+import TwemojiText from '../ui/TwemojiText';
 
 const CATEGORY_LABELS = {
   people: '顔文字と人',
@@ -92,7 +92,7 @@ const EmojiPicker = ({ currentGuild, guildEmojis, onEmoji }) => {
               {section.emojis.map((emoji, index) => (
                 <button type="button" key={`${section.category}-${emoji}-${index}`} className="app-emoji-option" onClick={() => onEmoji(emoji)} title={emoji}>
                   <md-ripple />
-                  <span dangerouslySetInnerHTML={{ __html: twemoji.parse(emoji, { folder: 'svg', ext: '.svg' }) }} />
+                  <TwemojiText>{emoji}</TwemojiText>
                 </button>
               ))}
             </div>

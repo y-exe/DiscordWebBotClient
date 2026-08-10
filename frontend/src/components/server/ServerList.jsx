@@ -386,9 +386,11 @@ const ServerList = ({ guilds, currentGuildId, onSelect, user, onSettings, onUser
           onMouseLeave={hideTooltip}
           aria-label={user?.username || 'ユーザー'}
         >
-          <span className="app-avatar relative">
-            <md-ripple />
-            {user?.avatar ? <img src={getProxyUrl(user.avatar)} alt="" /> : (user?.username?.[0] || 'U')}
+          <span className="app-user-avatar-wrap">
+            <span className="app-avatar">
+              <md-ripple />
+              {user?.avatar ? <img src={getProxyUrl(user.avatar)} alt="" /> : (user?.username?.[0] || 'U')}
+            </span>
             <span className="app-online-dot" />
           </span>
         </button>

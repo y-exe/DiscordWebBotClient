@@ -15,11 +15,15 @@ const setCookie = (name, value, days) => {
 };
 
 const getCookie = (name) => {
-  const value = document.cookie.split('; ').reduce((r, v) => {
-    const parts = v.split('=');
-    return parts[0] === name ? decodeURIComponent(parts[1]) : r;
+  const value = document.cookie.split('; ').reduce((result, entry) => {
+    const parts = entry.split('=');
+    return parts[0] === name ? decodeURIComponent(parts.slice(1).join('=')) : result;
   }, '');
-  try { return JSON.parse(value || '[]'); } catch (e) { return []; }
+  try {
+    return JSON.parse(value || '[]');
+  } catch {
+    return [];
+  }
 };
 
 let globalSocket = null;
@@ -31,11 +35,16 @@ const RequireAuth = ({ children }) => {
 
     useEffect(() => {
         const sessionStr = sessionStorage.getItem('current-session');
-        let session = sessionStr ? JSON.parse(sessionStr) : null;
+        let session = null;
+        try {
+            session = sessionStr ? JSON.parse(sessionStr) : null;
+        } catch {
+            sessionStorage.removeItem('current-session');
+        }
 
         if (!session) {
             const history = getCookie('discord-client-history');
-            if (history && history.length > 0) {
+            if (Array.isArray(history) && history.length > 0 && history[0].token) {
                 session = { token: history[0].token, isBot: history[0].isBot };
             }
         }
@@ -59,11 +68,15 @@ const RequireAuth = ({ children }) => {
                 setUser(userData);
                 setIsReady(true);
                 const currentHistory = getCookie('discord-client-history');
-                const newHistory = [{ token: session.token, isBot: session.isBot, ...userData }, ...currentHistory.filter(h => h.token !== session.token)].slice(0, 5);
+                const safeHistory = Array.isArray(currentHistory) ? currentHistory : [];
+                const newHistory = [
+                    { token: session.token, isBot: session.isBot === true, ...userData },
+                    ...safeHistory.filter((item) => item.token !== session.token),
+                ].slice(0, 5);
                 setCookie('discord-client-history', newHistory, 365);
             });
 
-            globalSocket.on('login-error', (err) => {
+            globalSocket.on('login-error', () => {
                 sessionStorage.removeItem('current-session');
                 globalSocket.disconnect();
                 globalSocket = null;

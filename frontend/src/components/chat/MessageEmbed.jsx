@@ -1,4 +1,5 @@
 import { getProxyUrl } from '../../utils/helpers';
+import { safeExternalUrl, safeMediaUrl } from '../../utils/security';
 
 const CUSTOM_EMOJI_RE = /<(a?):(\w+):(\d+)>/g;
 
@@ -17,7 +18,7 @@ const encodeMentions = (content) => {
     (full, userId) => `<mention data-type="userMention" data-user="${userId}">@user</mention>`);
   result = result.replace(/@everyone|@here/g,
     (full) => `<mention data-type="specialMention" data-text="${full === '@everyone' ? 'everyone' : 'here'}">@${full === '@everyone' ? 'everyone' : 'here'}</mention>`);
-  result = result.replace(/^-\# (.+)$/gm,
+  result = result.replace(/^-# (.+)$/gm,
     (full, text) => `<mention data-type="subtext">${escapeHtml(text)}</mention>`);
   return result;
 };
@@ -46,6 +47,11 @@ const parseCustomEmojis = (text) => {
 const MentionPill = ({ children, className = '' }) => (
   <span className={`mention-pill ${className}`}>{children}</span>
 );
+
+const SafeImage = ({ src, ...props }) => {
+  const safeSrc = safeMediaUrl(src);
+  return safeSrc ? <img src={getProxyUrl(safeSrc)} {...props} /> : null;
+};
 
 const MentionInline = ({ 'data-type': type, 'data-guild': guildId, 'data-channel': channelId, 'data-role': roleId, 'data-user': userId, 'data-text': text, children, channels, guildRoles, navigate }) => {
   switch (type) {
@@ -104,7 +110,10 @@ const MentionInline = ({ 'data-type': type, 'data-guild': guildId, 'data-channel
 const MessageEmbed = ({ embed, onImageClick, channels, guildRoles, guildId, navigate }) => {
   if (!embed) return null;
 
-  const embedColor = typeof embed.color === 'number' ? `#${embed.color.toString(16).padStart(6, '0')}` : (embed.color || '#1e1f22');
+  const embedColor = typeof embed.color === 'number'
+    ? `#${Math.max(0, Math.min(0xffffff, embed.color)).toString(16).padStart(6, '0')}`
+    : (/^#[0-9a-f]{6}$/i.test(embed.color || '') ? embed.color : '#1e1f22');
+  const embedUrl = safeExternalUrl(embed.url);
 
   const renderText = (text) => {
     if (!text) return text;
@@ -153,13 +162,13 @@ const MessageEmbed = ({ embed, onImageClick, channels, guildRoles, guildId, navi
         {embed.provider && <div className="text-xs text-discord-muted">{embed.provider.name}</div>}
         {embed.author && (
           <div className="flex items-center gap-2 text-sm font-bold text-white">
-            {(embed.author.iconURL || embed.author.icon_url) && <img src={getProxyUrl(embed.author.iconURL || embed.author.icon_url)} className="w-6 h-6 rounded-full" />}
+            {(embed.author.iconURL || embed.author.icon_url) && <SafeImage src={embed.author.iconURL || embed.author.icon_url} className="w-6 h-6 rounded-full" alt="" />}
             <span>{renderText(embed.author.name)}</span>
           </div>
         )}
         {embed.title && (
           <div className="font-bold text-[#00a8fc] hover:underline cursor-pointer">
-            {embed.url ? <a href={embed.url} target="_blank" rel="noreferrer">{renderText(embed.title)}</a> : renderText(embed.title)}
+            {embedUrl ? <a href={embedUrl} target="_blank" rel="noopener noreferrer">{renderText(embed.title)}</a> : renderText(embed.title)}
           </div>
         )}
         {embed.description && <div className="text-sm text-[#dcddde]">{renderText(embed.description)}</div>}
@@ -175,12 +184,12 @@ const MessageEmbed = ({ embed, onImageClick, channels, guildRoles, guildId, navi
         )}
       </div>
       <div className="flex gap-4">
-        {embed.thumbnail && <img src={getProxyUrl(embed.thumbnail.url)} className="rounded max-w-[80px] max-h-[80px] object-cover cursor-pointer" onClick={(e) => { e.stopPropagation(); onImageClick(embed.thumbnail.url); }} />}
-        {embed.image && <img src={getProxyUrl(embed.image.url)} className="rounded max-w-full max-h-[300px] object-contain cursor-pointer" onClick={(e) => { e.stopPropagation(); onImageClick(embed.image.url); }} />}
+        {embed.thumbnail && <SafeImage src={embed.thumbnail.url} className="rounded max-w-[80px] max-h-[80px] object-cover cursor-pointer" alt="" onClick={(e) => { e.stopPropagation(); const url = safeMediaUrl(embed.thumbnail.url); if (url) onImageClick(url); }} />}
+        {embed.image && <SafeImage src={embed.image.url} className="rounded max-w-full max-h-[300px] object-contain cursor-pointer" alt="" onClick={(e) => { e.stopPropagation(); const url = safeMediaUrl(embed.image.url); if (url) onImageClick(url); }} />}
       </div>
       {(embed.footer || embed.timestamp) && (
         <div className="text-xs text-discord-muted flex items-center gap-2 mt-1">
-          {(embed.footer?.iconURL || embed.footer?.icon_url) && <img src={getProxyUrl(embed.footer.iconURL || embed.footer.icon_url)} className="w-4 h-4 rounded-full" />}
+          {(embed.footer?.iconURL || embed.footer?.icon_url) && <SafeImage src={embed.footer.iconURL || embed.footer.icon_url} className="w-4 h-4 rounded-full" alt="" />}
           <span>{renderText(embed.footer?.text)}{embed.footer && embed.timestamp && " ・ "}{embed.timestamp && new Date(embed.timestamp).toLocaleString('ja-JP')}</span>
         </div>
       )}

@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { openExternalUrl, safeMediaUrl } from '../../utils/security';
 import { FaArrowDown, FaChevronLeft, FaChevronRight, FaExpand, FaUpRightFromSquare, FaXmark } from 'react-icons/fa6';
 
 import { getProxyUrl } from '../../utils/helpers';
@@ -38,9 +39,12 @@ const ImageViewer = ({ images, initialIndex, onClose }) => {
 
   const downloadImage = (e) => {
     e.stopPropagation();
+    const safeUrl = safeMediaUrl(currentUrl);
+    if (!safeUrl) return;
     const link = document.createElement('a');
-    link.href = currentUrl;
+    link.href = safeUrl;
     link.download = 'image.png';
+    link.rel = 'noopener noreferrer';
     link.click();
   };
 
@@ -52,7 +56,7 @@ const ImageViewer = ({ images, initialIndex, onClose }) => {
           <md-icon-button type="button" class="m3-viewer-button" title="拡大">
             <FaExpand size={18} />
           </md-icon-button>
-          <md-icon-button type="button" class="m3-viewer-button" title="元画像を開く" onClick={() => window.open(currentUrl, '_blank', 'noreferrer')}>
+          <md-icon-button type="button" class="m3-viewer-button" title="元画像を開く" onClick={() => openExternalUrl(currentUrl)}>
             <FaUpRightFromSquare size={18} />
           </md-icon-button>
           <md-icon-button type="button" class="m3-viewer-button" title="ダウンロード" onClick={downloadImage}>

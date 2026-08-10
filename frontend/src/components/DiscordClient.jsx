@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
-import { FaBell, FaChevronLeft, FaHashtag, FaInbox, FaMagnifyingGlass } from 'react-icons/fa6';
+import { useTheme } from 'next-themes';
+import { FaBell, FaChevronLeft, FaHashtag, FaInbox, FaMagnifyingGlass, FaXmark } from 'react-icons/fa6';
 
 import ServerList from './server/ServerList';
 import ChannelSidebar from './channel/ChannelSidebar';
@@ -23,6 +24,7 @@ import AppSettings from './settings/AppSettings';
 import { formatTimestamp, getProxyUrl } from '../utils/helpers';
 import { getStickerUrl, isLottieSticker } from '../utils/stickers';
 import { useTwemoji } from '../hooks/useTwemoji';
+import { useAppSettings } from '../hooks/useAppSettings';
 
 const ChannelHeaderName = ({ name }) => {
     const { ref } = useTwemoji();
@@ -38,7 +40,7 @@ const MessageAuthorName = ({ name, color, onClick }) => {
     );
 };
 
-const DraftUploadMessage = ({ draft, user }) => {
+const DraftUploadMessage = ({ draft, user, channels, roles, guildId, navigate, guilds }) => {
     if (!draft) return null;
     const statusText = draft.status === 'failed' ? '送信に失敗しました' : '送信中...';
 
@@ -52,7 +54,7 @@ const DraftUploadMessage = ({ draft, user }) => {
                         <span className="app-message-time">{statusText}</span>
                     </div>
                     <div className="app-message-content">
-                        {draft.content && <MessageContent content={draft.content} channels={allFlattenedChannels} guildRoles={guildRoles} guildId={paramGuildId} navigate={navigate} guilds={guilds} />}
+                        {draft.content && <MessageContent content={draft.content} channels={channels} guildRoles={roles} guildId={guildId} navigate={navigate} guilds={guilds} />}
                         {draft.files?.map((file) => (
                             <div key={file.id} className="app-draft-file">
                                 <div className="app-draft-upload-line">
@@ -150,6 +152,8 @@ const StickerPreviewMenu = ({ preview, guild, onClose }) => {
 export default function DiscordClient({ socket, user }) {
     const { guildId: paramGuildId = '@me', channelId: paramChannelId } = useParams();
     const navigate = useNavigate();
+    const { setTheme } = useTheme();
+    const { settings, updateSettings, resetSettings } = useAppSettings();
 
     const [guilds, setGuilds] = useState([]);
     const [channels, setChannels] = useState([]);
@@ -167,7 +171,7 @@ export default function DiscordClient({ socket, user }) {
     const [editInput, setEditInput] = useState("");
     const [previewData, setPreviewData] = useState({ isOpen: false, images: [], index: 0 });
     const [hoveredMessageId, setHoveredMessageId] = useState(null);
-    const [joinedVoiceChannelId, setJoinedVoiceChannelId] = useState(null);
+    const [joinedVoiceChannelId] = useState(null);
     const [loadingOlder, setLoadingOlder] = useState(false);
     const [loadingChannelId, setLoadingChannelId] = useState(null);
     const [settingsOpen, setSettingsOpen] = useState(false);
@@ -181,6 +185,23 @@ export default function DiscordClient({ socket, user }) {
     const scrollRef = useRef(null);
     const messagesEndRef = useRef(null);
     const isFriendsRoute = paramGuildId === '@me' && paramChannelId === 'friends';
+
+    useEffect(() => setTheme(settings.theme), [setTheme, settings.theme]);
+
+    useEffect(() => {
+        const handleShortcut = (event) => {
+            if ((event.ctrlKey || event.metaKey) && event.key === ',') {
+                event.preventDefault();
+                setSettingsOpen(true);
+            }
+            if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 'k') {
+                event.preventDefault();
+                document.querySelector('[data-chat-input]')?.focus();
+            }
+        };
+        window.addEventListener('keydown', handleShortcut);
+        return () => window.removeEventListener('keydown', handleShortcut);
+    }, []);
 
     const scrollToBottom = useCallback((smooth = false) => {
         if (messagesEndRef.current) messagesEndRef.current.scrollIntoView({ behavior: smooth ? "smooth" : "auto", block: "end" });
@@ -289,25 +310,55 @@ export default function DiscordClient({ socket, user }) {
                 setMessages((p) => (p.some((m) => m.id === msg.id) ? p : [...p, msg]));
                 setTimeout(() => scrollToBottom(true), 100);
             }
+            if (msg.author?.id !== user?.id && document.hidden) {
+                if (settings.desktopNotifications && 'Notification' in window && Notification.permission === 'granted') {
+                    const notification = new Notification(msg.author?.displayName || msg.author?.username || '新しいメッセージ', {
+                        body: msg.content || '添付ファイルが届きました',
+                        icon: msg.author?.avatar ? getProxyUrl(msg.author.avatar) : undefined,
+                        tag: `discord-message-${msg.channelId}`,
+                    });
+                    notification.onclick = () => {
+                        window.focus();
+                        navigate(`/${paramGuildId}/${msg.channelId}`);
+                        notification.close();
+                    };
+                }
+                if (settings.notificationSound) {
+                    try {
+                        const AudioContext = window.AudioContext || window.webkitAudioContext;
+                        const context = new AudioContext();
+                        const oscillator = context.createOscillator();
+                        const gain = context.createGain();
+                        oscillator.frequency.value = 660;
+                        gain.gain.setValueAtTime(0.045, context.currentTime);
+                        gain.gain.exponentialRampToValueAtTime(0.001, context.currentTime + 0.14);
+                        oscillator.connect(gain).connect(context.destination);
+                        oscillator.start();
+                        oscillator.stop(context.currentTime + 0.14);
+                        oscillator.onended = () => context.close();
+                    } catch { /* Autoplay policies may block notification audio. */ }
+                }
+            }
         };
         const onUpdMsg = (msg) => { if (msg.channelId === paramChannelId) setMessages((p) => p.map((m) => m.id === msg.id ? msg : m)); };
         const onDelMsg = ({ id }) => setMessages((p) => p.filter((m) => m.id !== id));
         const onChannelsUpd = (data) => setChannels(data);
+        const onModalResponse = (modal) => setActiveModal(modal);
 
         socket.on('newMessage', onNewMsg);
         socket.on('messageUpdate', onUpdMsg);
         socket.on('messageDelete', onDelMsg);
         socket.on('channelsUpdate', onChannelsUpd);
-        socket.on('modalResponse', (modal) => setActiveModal(modal));
+        socket.on('modalResponse', onModalResponse);
 
         return () => {
             socket.off('newMessage', onNewMsg);
             socket.off('messageUpdate', onUpdMsg);
             socket.off('messageDelete', onDelMsg);
             socket.off('channelsUpdate', onChannelsUpd);
-            socket.off('modalResponse', (modal) => setActiveModal(modal));
+            socket.off('modalResponse', onModalResponse);
         };
-    }, [socket, paramChannelId, scrollToBottom]);
+    }, [socket, paramChannelId, paramGuildId, navigate, scrollToBottom, settings.desktopNotifications, settings.notificationSound, user?.id]);
 
     const handleScroll = (e) => {
         const { scrollTop } = e.currentTarget;
@@ -330,6 +381,10 @@ export default function DiscordClient({ socket, user }) {
     const allFlattenedChannels = channels.flatMap((c) => [...(c.channels || []), ...(c.channels?.flatMap((mc) => mc.threads || []) || [])]);
     const currentChannel = allFlattenedChannels.find((c) => c.id === paramChannelId);
     const isForum = currentChannel?.type === 'GUILD_FORUM' || currentChannel?.type === 15;
+    const parentForum = channels
+        .flatMap((category) => category.channels || [])
+        .find((channel) => (channel.type === 'GUILD_FORUM' || channel.type === 15) && channel.threads?.some((thread) => thread.id === paramChannelId));
+    const forumContext = isForum ? currentChannel : parentForum;
     const currentGuildData = paramGuildId === '@me' ? { id: '@me', name: "ダイレクトメッセージ", acronym: "DM" } : guilds.find((g) => g.id === paramGuildId);
     const stickerPreviewGuild = stickerPreview?.sticker?.guildId ? guilds.find((g) => g.id === stickerPreview.sticker.guildId) || currentGuildData : currentGuildData;
     const isChannelLoading = loadingChannelId === paramChannelId;
@@ -357,7 +412,7 @@ export default function DiscordClient({ socket, user }) {
                         onUserClick={(e) => {
                             e.preventDefault();
                             e.stopPropagation();
-                            setUserPopout({ x: e.pageX + 12, y: e.pageY, userId: user.id });
+                            setUserPopout({ x: e.pageX + 12, y: e.pageY, userId: user.id, fallbackUser: user });
                         }}
                         onSelect={(gid) => navigate(`/${gid}`)}
                     />
@@ -377,16 +432,30 @@ export default function DiscordClient({ socket, user }) {
                 <div className={`app-content-shell ${showMobileChat ? 'flex' : 'hidden md:flex'}`}>
                     {isFriendsRoute ? (
                         <FriendsView friends={friends} loading={friendsLoading} />
-                    ) : isForum ? (
-                        <ForumView threads={currentChannel.threads || []} channelName={currentChannel.name} onSelectThread={(ch) => navigate(`/${paramGuildId}/${ch.id}`)} onBack={() => navigate(`/${paramGuildId}`)} />
                     ) : (
-                        <main className="app-chat">
+                        <>
+                        {forumContext && (
+                            <ForumView
+                                threads={forumContext.threads || []}
+                                channelName={forumContext.name}
+                                selectedThreadId={parentForum ? paramChannelId : null}
+                                split={Boolean(parentForum)}
+                                onSelectThread={(channel) => navigate(`/${paramGuildId}/${channel.id}`)}
+                                onBack={() => navigate(`/${paramGuildId}`)}
+                            />
+                        )}
+                        {!isForum && <main className="app-chat" data-thread-pane={parentForum ? 'true' : 'false'}>
                             <header className="app-chat-header">
                                 <md-icon-button onClick={() => navigate(`/${paramGuildId}`)} class="m3-icon-button md:hidden" title="戻る">
                                     <FaChevronLeft size={18} />
                                 </md-icon-button>
                                 <FaHashtag className="shrink-0" size={18} />
                                 <ChannelHeaderName name={currentChannel?.name || (paramGuildId === '@me' ? "DM" : "チャンネルを選択")} />
+                                {parentForum && (
+                                    <md-icon-button class="m3-icon-button app-thread-close" title="スレッドを閉じる" onClick={() => navigate(`/${paramGuildId}/${parentForum.id}`)}>
+                                        <FaXmark size={17} />
+                                    </md-icon-button>
+                                )}
                                 <div className="hidden items-center gap-1 sm:flex">
                                     <md-icon-button class="m3-icon-button" title="通知"><FaBell size={16} /></md-icon-button>
                                     <md-icon-button class="m3-icon-button" title="受信トレイ"><FaInbox size={17} /></md-icon-button>
@@ -401,8 +470,7 @@ export default function DiscordClient({ socket, user }) {
                                 <>
                                     <div ref={scrollRef} onScroll={handleScroll} className="app-messages no-scrollbar" data-loading={isChannelLoading ? 'true' : 'false'} aria-busy={isChannelLoading}>
                                         <div className="app-channel-loading" data-visible={isChannelLoading ? 'true' : 'false'} role="status" aria-live="polite" aria-hidden={!isChannelLoading}>
-                                            <span className="app-loading-spinner" aria-hidden="true" />
-                                            <span>チャンネルを読み込み中</span>
+                                            <md-linear-progress indeterminate aria-label="チャンネルを読み込み中" />
                                         </div>
                                         <div className="flex select-none flex-col mx-4 mt-[18px] mb-2.5 text-[var(--app-on-surface)]">
                                             <h1 className="m-0 text-[32px] leading-[1.15] font-[650]">{currentChannel?.name || '会話'}</h1>
@@ -445,7 +513,7 @@ export default function DiscordClient({ socket, user }) {
                                                         <img
                                                             src={getProxyUrl(m.author.avatar)}
                                                             className="w-9 h-9 shrink-0 mx-1 my-0.5 rounded-full object-cover bg-[var(--app-surface-container-highest)]"
-                                                            onClick={(e) => { e.preventDefault(); e.stopPropagation(); setUserPopout({ x: e.pageX, y: e.pageY, userId: m.author.id }); }}
+                                                            onClick={(e) => { e.preventDefault(); e.stopPropagation(); setUserPopout({ x: e.pageX, y: e.pageY, userId: m.author.id, fallbackUser: m.author }); }}
                                                             alt=""
                                                         />
                                                         <div className="min-w-0 flex-1 overflow-hidden pr-4">
@@ -453,7 +521,7 @@ export default function DiscordClient({ socket, user }) {
                                                                 <MessageAuthorName 
                                                                     name={m.author.displayName} 
                                                                     color={nameColor} 
-                                                                    onClick={(e) => { e.preventDefault(); e.stopPropagation(); setUserPopout({ x: e.pageX, y: e.pageY, userId: m.author.id }); }} 
+                                                                    onClick={(e) => { e.preventDefault(); e.stopPropagation(); setUserPopout({ x: e.pageX, y: e.pageY, userId: m.author.id, fallbackUser: m.author }); }}
                                                                 />
                                                                 <span className="text-sm font-medium text-[var(--app-outline)]">{formatTimestamp(m.timestamp)}</span>
                                                             </div>
@@ -591,7 +659,7 @@ export default function DiscordClient({ socket, user }) {
                                                 </article>
                                             );
                                         })}
-                                        {uploadDraft && <DraftUploadMessage draft={uploadDraft} user={user} />}
+                                        {uploadDraft && <DraftUploadMessage draft={uploadDraft} user={user} channels={allFlattenedChannels} roles={guildRoles} guildId={paramGuildId} navigate={navigate} guilds={guilds} />}
                                         <div ref={messagesEndRef} className="h-6 shrink-0" />
                                     </div>
                                     <ChatInput
@@ -627,7 +695,7 @@ export default function DiscordClient({ socket, user }) {
                                         }}
                                         onDraftChange={setUploadDraft}
                                         slashCommands={slashCommands}
-                                        onSlashCommand={(cmd, options) => {
+                                        onSlashCommand={(cmd) => {
                                             const commandContent = `</${cmd.name}:${cmd.id}>`;
                                             socket.timeout(45000).emit('sendMessage', {
                                                 channelId: paramChannelId,
@@ -638,7 +706,7 @@ export default function DiscordClient({ socket, user }) {
                                                 if (result?.ok !== false) setReplyingTo(null);
                                             });
                                         }}
-                                        socket={socket}
+                                        showSendButton={settings.showSendButton}
                                     />
                                 </>
                             ) : (
@@ -652,12 +720,26 @@ export default function DiscordClient({ socket, user }) {
                                     </div>
                                 </div>
                             )}
-                        </main>
+                        </main>}
+                        </>
                     )}
                 </div>
             </div>
 
-            {settingsOpen && <AppSettings user={user} onClose={() => setSettingsOpen(false)} />}
+            {settingsOpen && (
+                <AppSettings
+                    user={user}
+                    settings={settings}
+                    onSettingsChange={updateSettings}
+                    onReset={resetSettings}
+                    onClose={() => setSettingsOpen(false)}
+                    onLogout={() => {
+                        sessionStorage.removeItem('current-session');
+                        socket?.disconnect();
+                        window.location.assign('/login');
+                    }}
+                />
+            )}
             {activeModal && (
                 <ModalDialog
                     modal={activeModal}
@@ -681,7 +763,7 @@ export default function DiscordClient({ socket, user }) {
                 onClose={(key) => setStickerPreview((current) => (!key || current?.key === key ? null : current))}
             />
             {previewData.isOpen && <ImageViewer images={previewData.images} initialIndex={previewData.index} onClose={() => setPreviewData({ ...previewData, isOpen: false })} />}
-            {userPopout && <UserPopout userId={userPopout.userId} guildId={paramGuildId} x={userPopout.x} y={userPopout.y} socket={socket} onClose={() => setUserPopout(null)} />}
+            {userPopout && <UserPopout userId={userPopout.userId} guildId={paramGuildId} x={userPopout.x} y={userPopout.y} socket={socket} fallbackUser={userPopout.fallbackUser} onClose={() => setUserPopout(null)} />}
             {mediaPicker && (
                 <div className="app-floating-picker" style={pickerStyle}>
                     <MediaPicker

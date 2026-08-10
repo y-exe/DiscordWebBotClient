@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { openExternalUrl, safeExternalUrl } from '../../utils/security';
 
 const BUTTON_STYLES = {
   1: 'bg-[#5865F2] text-white hover:brightness-110',
@@ -16,7 +17,7 @@ const MessageComponents = ({ components, channelId, messageId, guildId, socket, 
   const handleInteraction = async (component) => {
     if (component.type === 2 && component.custom_id) {
       if (component.style === 5 && component.url) {
-        window.open(component.url, '_blank');
+        openExternalUrl(component.url);
         return;
       }
 
@@ -90,9 +91,11 @@ const ButtonComponent = ({ component, onClick, loading }) => {
   const isLink = style === 5 || !!url;
 
   if (isLink) {
+    const safeUrl = safeExternalUrl(url);
+    if (!safeUrl) return null;
     return (
       <a
-        href={url}
+        href={safeUrl}
         target="_blank"
         rel="noopener noreferrer"
         className={`inline-flex items-center gap-1.5 px-4 py-2 rounded-lg text-sm font-medium transition-opacity ${BUTTON_STYLES[style] || BUTTON_STYLES[3]}`}

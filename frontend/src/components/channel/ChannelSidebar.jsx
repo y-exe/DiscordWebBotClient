@@ -161,12 +161,12 @@ const ChannelSidebar = ({
                         <button
                           key={thread.id}
                           type="button"
-                          className="app-menu-button !h-8 !text-sm"
+                          className="app-menu-button app-thread-channel"
                           data-selected={currentChannelId === thread.id}
                           onClick={() => onSelectChannel(thread)}
                         >
                           <md-ripple />
-                          <FaHashtag size={14} />
+                          <ForumIcon size={14} />
                           <ChannelName name={thread.name} />
                         </button>
                       ))}

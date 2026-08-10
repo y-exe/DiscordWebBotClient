@@ -4,7 +4,11 @@ import { FaFaceSmile, FaFileCirclePlus, FaImage, FaNoteSticky, FaPaperPlane, FaP
 import MessageReply from './MessageReply';
 import SlashCommandList from './SlashCommandList';
 
-const ChatInput = ({ channelName, disabled, onSend, replyingTo, onCancelReply, onToggleMention, onEmojiClick, onStickerClick, onDraftChange, slashCommands = [], onSlashCommand, socket }) => {
+const MAX_FILES = 10;
+const MAX_FILE_BYTES = 10 * 1024 * 1024;
+const MAX_TOTAL_FILE_BYTES = 20 * 1024 * 1024;
+
+const ChatInput = ({ channelName, disabled, onSend, replyingTo, onCancelReply, onToggleMention, onEmojiClick, onStickerClick, onDraftChange, slashCommands = [], onSlashCommand, showSendButton = true }) => {
   const [text, setText] = useState('');
   const [files, setFiles] = useState([]);
   const [sending, setSending] = useState(false);
@@ -15,6 +19,7 @@ const ChatInput = ({ channelName, disabled, onSend, replyingTo, onCancelReply, o
   const [currentCommand, setCurrentCommand] = useState(null);
   const fileInputRef = useRef(null);
   const textAreaRef = useRef(null);
+  const filesRef = useRef([]);
   const progressRef = useRef({});
   const progressTimersRef = useRef({});
 
@@ -27,14 +32,17 @@ const ChatInput = ({ channelName, disabled, onSend, replyingTo, onCancelReply, o
     return () => window.removeEventListener('insert-emoji', handleEmojiInsert);
   }, []);
 
+  filesRef.current = files;
+
   useEffect(() => {
+    const timers = progressTimersRef.current;
     return () => {
-      files.forEach((item) => {
+      filesRef.current.forEach((item) => {
         if (item.previewUrl) URL.revokeObjectURL(item.previewUrl);
       });
-      Object.values(progressTimersRef.current).forEach((timer) => window.clearInterval(timer));
+      Object.values(timers).forEach((timer) => window.clearInterval(timer));
     };
-  }, [files]);
+  }, []);
 
   const setDraftProgress = (id, progress) => {
     const nextProgress = Math.max(0, Math.min(100, Math.round(progress)));
@@ -169,7 +177,22 @@ const ChatInput = ({ channelName, disabled, onSend, replyingTo, onCancelReply, o
   };
 
   const addFiles = (fileList) => {
-    const nextFiles = Array.from(fileList || []).map((file) => ({
+    const candidates = Array.from(fileList || []);
+    const existingBytes = files.reduce((sum, item) => sum + item.file.size, 0);
+    if (files.length + candidates.length > MAX_FILES) {
+      setSendError(`添付できるファイルは${MAX_FILES}個までです`);
+      return;
+    }
+    if (candidates.some((file) => file.size > MAX_FILE_BYTES)) {
+      setSendError('1ファイルの上限は10MBです');
+      return;
+    }
+    if (existingBytes + candidates.reduce((sum, file) => sum + file.size, 0) > MAX_TOTAL_FILE_BYTES) {
+      setSendError('添付ファイルの合計上限は20MBです');
+      return;
+    }
+    setSendError('');
+    const nextFiles = candidates.map((file) => ({
       id: `${file.name}-${file.size}-${file.lastModified}-${crypto.randomUUID?.() || Math.random()}`,
       file,
       previewUrl: file.type.startsWith('image/') ? URL.createObjectURL(file) : null
@@ -296,9 +319,11 @@ const ChatInput = ({ channelName, disabled, onSend, replyingTo, onCancelReply, o
         </div>
 
         <textarea
+          data-chat-input
           ref={textAreaRef}
           rows={Math.min(text.split('\n').length || 1, 10)}
           value={text}
+          maxLength={4000}
           onChange={handleTextChange}
           onKeyDown={(e) => {
             if (e.key === 'Enter' && !e.shiftKey) {
@@ -319,7 +344,7 @@ const ChatInput = ({ channelName, disabled, onSend, replyingTo, onCancelReply, o
             <FaFaceSmile />
           </md-icon-button>
 
-          <button
+          {showSendButton && <button
             type="button"
             className="app-send-button"
             disabled={!canSend}
@@ -327,7 +352,7 @@ const ChatInput = ({ channelName, disabled, onSend, replyingTo, onCancelReply, o
             title="メッセージを送信"
           >
             <FaPaperPlane />
-          </button>
+          </button>}
         </div>
       </div>
     </div>

@@ -1,7 +1,23 @@
-export const API_URL = "https://dapi.yexe.xyz/";
+export const API_URL = (import.meta.env.VITE_API_URL || "https://dapi.yexe.xyz").replace(/\/$/, '');
+
+const PROXY_IMAGE_HOSTS = new Set([
+  'cdn.discordapp.com',
+  'media.discordapp.net',
+  'images-ext-1.discordapp.net',
+  'images-ext-2.discordapp.net'
+]);
 
 export const getProxyUrl = (url) => {
-  return url;
+  if (typeof url !== 'string') return '';
+  try {
+    const parsed = new URL(url, window.location.origin);
+    if (parsed.protocol === 'https:' && PROXY_IMAGE_HOSTS.has(parsed.hostname.toLowerCase())) {
+      return `${API_URL}/api/image-proxy?url=${encodeURIComponent(parsed.href)}`;
+    }
+    return parsed.protocol === 'https:' || parsed.protocol === 'http:' || parsed.protocol === 'blob:' ? parsed.href : '';
+  } catch {
+    return '';
+  }
 };
 
 export const formatTimestamp = (ts) => {

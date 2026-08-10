@@ -1,11 +1,22 @@
-import { useEffect, useMemo, useCallback } from 'react';
+import { useEffect, useMemo } from 'react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import rehypeRaw from 'rehype-raw';
+import rehypeSanitize, { defaultSchema } from 'rehype-sanitize';
 import { getProxyUrl } from '../../utils/helpers';
 import { useTwemoji } from '../../hooks/useTwemoji';
+import { safeExternalUrl } from '../../utils/security';
 
 const CUSTOM_EMOJI_RE = /<(a?):(\w+):(\d+)>/g;
+
+const messageSchema = {
+  ...defaultSchema,
+  tagNames: [...(defaultSchema.tagNames || []).filter((tag) => tag !== 'img'), 'mention'],
+  attributes: {
+    ...defaultSchema.attributes,
+    mention: ['dataType', 'dataGuild', 'dataChannel', 'dataRole', 'dataUser', 'dataText'],
+  },
+};
 
 const escapeHtml = (s) => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
 
@@ -23,7 +34,7 @@ const encodeMentions = (content) => {
     (full, userId) => `<mention data-type="userMention" data-user="${userId}">@user</mention>`);
   result = result.replace(/@everyone|@here/g,
     (full) => `<mention data-type="specialMention" data-text="${full === '@everyone' ? 'everyone' : 'here'}">@${full === '@everyone' ? 'everyone' : 'here'}</mention>`);
-  result = result.replace(/^-\# (.+)$/gm,
+  result = result.replace(/^-# (.+)$/gm,
     (full, text) => `<mention data-type="subtext">${escapeHtml(text)}</mention>`);
 
   return result;
@@ -126,7 +137,7 @@ const MessageContent = ({ content, channels, guildRoles, guildId, navigate }) =>
     <div ref={ref} className="app-markdown">
       <ReactMarkdown
         remarkPlugins={[remarkGfm]}
-        rehypePlugins={[rehypeRaw]}
+        rehypePlugins={[rehypeRaw, [rehypeSanitize, messageSchema]]}
         components={{
           mention: (props) => <MentionComponent {...props} {...mentionProps} />,
           p: ({ children }) => {
@@ -135,11 +146,14 @@ const MessageContent = ({ content, channels, guildRoles, guildId, navigate }) =>
               : typeof children === 'string' ? parseCustomEmojis(children) : children;
             return <p className="m-0 inline">{processed}</p>;
           },
-          a: ({ node, ...props }) => <a {...props} className="text-[#00a8fc] hover:underline cursor-pointer" target="_blank" rel="noreferrer" />,
+          a: ({ href, ...props }) => {
+            const safeHref = safeExternalUrl(href);
+            return safeHref ? <a {...props} href={safeHref} className="text-[#00a8fc] hover:underline cursor-pointer" target="_blank" rel="noopener noreferrer" /> : <span {...props} />;
+          },
           code: ({ inline, ...props }) => inline
             ? <code {...props} className="app-code-inline" />
             : <code {...props} className="app-code-block" />,
-          blockquote: ({ node, ...props }) => <blockquote {...props} className="app-blockquote" />,
+          blockquote: (props) => <blockquote {...props} className="app-blockquote" />,
           h1: ({ children }) => <h1 className="text-2xl font-bold m-0 leading-tight">{children}</h1>,
           h2: ({ children }) => <h2 className="text-xl font-bold m-0 leading-tight">{children}</h2>,
           h3: ({ children }) => <h3 className="text-base font-bold m-0 leading-tight">{children}</h3>,

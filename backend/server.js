@@ -1,9 +1,12 @@
 require('dotenv').config();
 const http = require('http');
 const express = require('express');
-const axios = require('axios');
+const dns = require('dns').promises;
+const net = require('net');
 const { Server } = require("socket.io");
 const cors = require('cors');
+const helmet = require('helmet');
+const { rateLimit } = require('express-rate-limit');
 
 const { Client: SelfClient } = require('discord.js-selfbot-v13');
 let BotClient, GatewayIntentBits, Partials;
@@ -15,24 +18,178 @@ try {
 } catch (e) { }
 
 const app = express();
-app.use(cors({ origin: "*" }));
+app.disable('x-powered-by');
+
+const IS_PRODUCTION = process.env.NODE_ENV === 'production';
+const ALLOWED_ORIGINS = new Set(
+    (process.env.ALLOWED_ORIGINS || '')
+        .split(',')
+        .map((origin) => origin.trim().replace(/\/$/, ''))
+        .filter(Boolean)
+);
+if (!IS_PRODUCTION) {
+    ALLOWED_ORIGINS.add('http://localhost:5173');
+    ALLOWED_ORIGINS.add('http://127.0.0.1:5173');
+}
+
+const isAllowedOrigin = (origin) => {
+    if (!origin) return !IS_PRODUCTION || process.env.ALLOW_NO_ORIGIN === 'true';
+    try { return ALLOWED_ORIGINS.has(new URL(origin).origin); } catch { return false; }
+};
+
+const corsOptions = {
+    origin(origin, callback) { callback(null, isAllowedOrigin(origin)); },
+    methods: ['GET', 'OPTIONS'],
+    maxAge: 86400
+};
+
+app.use(helmet({
+    crossOriginResourcePolicy: { policy: 'cross-origin' },
+    contentSecurityPolicy: {
+        directives: {
+            defaultSrc: ["'none'"],
+            imgSrc: ["'self'", 'data:'],
+            frameAncestors: ["'none'"],
+            baseUri: ["'none'"],
+        }
+    }
+}));
+app.use(cors(corsOptions));
 const server = http.createServer(app);
-const io = new Server(server, { cors: { origin: "*" }, maxHttpBufferSize: 1e8 });
+const io = new Server(server, {
+    cors: corsOptions,
+    allowRequest: (req, callback) => callback(null, isAllowedOrigin(req.headers.origin)),
+    maxHttpBufferSize: 30 * 1024 * 1024,
+    perMessageDeflate: false,
+    serveClient: false
+});
 
 const sessions = new Map();
 const loginQueue = new Set();
 
-app.get('/api/image-proxy', async (req, res) => {
-    const imageUrl = req.query.url;
-    if (!imageUrl) return res.status(400).send('URL is required');
+const IMAGE_PROXY_HOSTS = new Set(
+    (process.env.IMAGE_PROXY_HOSTS || 'cdn.discordapp.com,media.discordapp.net,images-ext-1.discordapp.net,images-ext-2.discordapp.net')
+        .split(',').map((host) => host.trim().toLowerCase()).filter(Boolean)
+);
+const MAX_PROXY_BYTES = 10 * 1024 * 1024;
+const ALLOWED_IMAGE_TYPES = new Set(['image/png', 'image/jpeg', 'image/gif', 'image/webp', 'image/avif']);
+const imageProxyLimiter = rateLimit({ windowMs: 60_000, limit: 60, standardHeaders: 'draft-8', legacyHeaders: false });
+
+const isPrivateAddress = (address) => {
+    if (net.isIPv4(address)) {
+        const [a, b] = address.split('.').map(Number);
+        return a === 0 || a === 10 || a === 127 || (a === 169 && b === 254) || (a === 172 && b >= 16 && b <= 31) || (a === 192 && b === 168) || a >= 224;
+    }
+    if (net.isIPv6(address)) {
+        const normalized = address.toLowerCase();
+        const mappedV4 = normalized.match(/^::ffff:(\d+\.\d+\.\d+\.\d+)$/)?.[1];
+        if (mappedV4) return isPrivateAddress(mappedV4);
+        return normalized === '::' || normalized === '::1' || normalized.startsWith('fc') || normalized.startsWith('fd') || normalized.startsWith('fe8') || normalized.startsWith('fe9') || normalized.startsWith('fea') || normalized.startsWith('feb') || normalized.startsWith('ff');
+    }
+    return true;
+};
+
+const validateProxyUrl = async (value) => {
+    if (typeof value !== 'string' || value.length > 2048) throw new Error('invalid_url');
+    const url = new URL(value);
+    if (url.protocol !== 'https:' || url.username || url.password || (url.port && url.port !== '443')) throw new Error('invalid_url');
+    if (!IMAGE_PROXY_HOSTS.has(url.hostname.toLowerCase())) throw new Error('host_not_allowed');
+    const addresses = await dns.lookup(url.hostname, { all: true, verbatim: true });
+    if (!addresses.length || addresses.some(({ address }) => isPrivateAddress(address))) throw new Error('unsafe_address');
+    return url;
+};
+
+app.get('/api/image-proxy', imageProxyLimiter, async (req, res) => {
     try {
-        const response = await axios.get(imageUrl, { responseType: 'arraybuffer' });
-        res.setHeader('Content-Type', response.headers['content-type']);
-        res.send(response.data);
-    } catch (error) { res.status(500).send('Failed'); }
+        const imageUrl = await validateProxyUrl(req.query.url);
+        const response = await fetch(imageUrl, { redirect: 'error', signal: AbortSignal.timeout(5_000) });
+        const contentType = String(response.headers.get('content-type') || '').split(';')[0].toLowerCase();
+        const declaredSize = Number(response.headers.get('content-length') || 0);
+        if (!response.ok || !ALLOWED_IMAGE_TYPES.has(contentType) || declaredSize > MAX_PROXY_BYTES || !response.body) {
+            return res.status(502).json({ error: 'Image could not be fetched' });
+        }
+
+        const reader = response.body.getReader();
+        const chunks = [];
+        let size = 0;
+        while (true) {
+            const { done, value } = await reader.read();
+            if (done) break;
+            size += value.byteLength;
+            if (size > MAX_PROXY_BYTES) {
+                await reader.cancel();
+                return res.status(413).json({ error: 'Image is too large' });
+            }
+            chunks.push(Buffer.from(value));
+        }
+
+        res.setHeader('Content-Type', contentType);
+        res.setHeader('Content-Length', String(size));
+        res.setHeader('Cache-Control', 'public, max-age=86400, immutable');
+        res.setHeader('X-Content-Type-Options', 'nosniff');
+        return res.send(Buffer.concat(chunks, size));
+    } catch (error) {
+        const status = ['invalid_url', 'host_not_allowed', 'unsafe_address'].includes(error.message) ? 400 : 502;
+        return res.status(status).json({ error: status === 400 ? 'Invalid image URL' : 'Image could not be fetched' });
+    }
 });
 
 const snowflakeToTimestamp = (id) => Number(BigInt(id) >> 22n) + 1420070400000;
+const SNOWFLAKE_RE = /^\d{16,22}$/;
+const isSnowflake = (value) => typeof value === 'string' && SNOWFLAKE_RE.test(value);
+const cleanText = (value, maxLength) => typeof value === 'string' ? value.replace(/[\u0000-\u0008\u000b\u000c\u000e-\u001f\u007f]/g, '').slice(0, maxLength) : '';
+const publicError = (fallback = 'Request failed') => ({ ok: false, error: fallback });
+const safeAck = (callback) => typeof callback === 'function' ? callback : () => {};
+const isPlainObject = (value) => value !== null && typeof value === 'object' && !Array.isArray(value);
+const MAX_MESSAGE_LENGTH = 4000;
+const MAX_FILES = 10;
+const MAX_FILE_BYTES = 10 * 1024 * 1024;
+const MAX_TOTAL_FILE_BYTES = 20 * 1024 * 1024;
+const BASE64_RE = /^[A-Za-z0-9+/]*={0,2}$/;
+const COMMAND_NAME_RE = /^[\p{L}\p{N}_-]{1,32}$/u;
+
+const parseAttachment = (file) => {
+    if (!isPlainObject(file)) throw new Error('invalid_attachment');
+    const rawData = typeof file.data === 'string' ? file.data : '';
+    const commaIndex = rawData.indexOf(',');
+    const base64 = commaIndex >= 0 ? rawData.slice(commaIndex + 1) : rawData;
+    if (!base64 || base64.length > Math.ceil(MAX_FILE_BYTES / 3) * 4 + 4 || !BASE64_RE.test(base64)) {
+        throw new Error('invalid_attachment');
+    }
+    const attachment = Buffer.from(base64, 'base64');
+    if (!attachment.length || attachment.length > MAX_FILE_BYTES) throw new Error('invalid_attachment');
+    if (Number.isFinite(file.size) && Number(file.size) !== attachment.length) throw new Error('invalid_attachment');
+    const name = cleanText(file.name, 128).replace(/[\\/:*?"<>|]/g, '_').trim() || 'attachment';
+    return { attachment, name, description: name };
+};
+
+const discordFetch = (url, options = {}) => {
+    const parsed = new URL(url);
+    if (parsed.protocol !== 'https:' || parsed.hostname !== 'discord.com' || !parsed.pathname.startsWith('/api/')) {
+        throw new Error('invalid_discord_url');
+    }
+    return fetch(parsed, { ...options, redirect: 'error', signal: AbortSignal.timeout(10_000) });
+};
+
+const connectionAttempts = new Map();
+const consumeLimit = (store, key, limit, windowMs) => {
+    const now = Date.now();
+    const current = store.get(key);
+    if (!current || current.resetAt <= now) {
+        store.set(key, { count: 1, resetAt: now + windowMs });
+        return true;
+    }
+    if (current.count >= limit) return false;
+    current.count += 1;
+    return true;
+};
+const limitCleanupTimer = setInterval(() => {
+    const now = Date.now();
+    for (const [key, value] of connectionAttempts) {
+        if (value.resetAt <= now) connectionAttempts.delete(key);
+    }
+}, 60_000);
+limitCleanupTimer.unref();
 
 const getUserDisplayName = (user, member = null) => {
     if (member?.nickname) return member.nickname;
@@ -190,7 +347,7 @@ const getChannelsWithMembers = (guild) => {
             id: m.id, username: m.displayName, avatar: m.user.displayAvatarURL({ format: 'png' })
         })) : [],
         threads: allThreads.filter(t => t.parentId === c.id).map(t => ({
-            id: t.id, name: t.name, type: t.type,
+            id: t.id, name: t.name, type: t.type, parentId: t.parentId,
             lastMessageTimestamp: t.lastMessageId ? snowflakeToTimestamp(t.lastMessageId) : t.createdTimestamp,
             messageCount: t.messageCount || 0
         })).sort((a, b) => b.lastMessageTimestamp - a.lastMessageTimestamp)
@@ -286,10 +443,38 @@ const destroySession = (id) => {
     loginQueue.delete(id);
 };
 
+io.use((socket, next) => {
+    const address = socket.handshake.address || 'unknown';
+    if (!consumeLimit(connectionAttempts, address, 30, 60_000)) return next(new Error('Too many connection attempts'));
+    return next();
+});
+
 io.on('connection', (socket) => {
     console.log(`[Socket] Connected: ${socket.id}`);
 
-    socket.on('login', async ({ token, isBot }) => {
+    const eventLimits = new Map();
+    const allowedEvents = new Set([
+        'login', 'getGuilds', 'getChannels', 'getFriends', 'getGuildEmojis', 'getGuildStickers',
+        'getGuildRoles', 'getMessages', 'sendMessage', 'getUserProfile', 'getUserInfo',
+        'addReaction', 'removeReaction', 'getSlashCommands', 'sendSlashCommand', 'interaction'
+    ]);
+    socket.use(([event], next) => {
+        if (!allowedEvents.has(event)) return next(new Error('Unknown event'));
+        const isMutation = ['login', 'sendMessage', 'addReaction', 'removeReaction', 'sendSlashCommand', 'interaction'].includes(event);
+        const isExpensiveRead = ['getUserProfile', 'getUserInfo', 'getSlashCommands'].includes(event);
+        const limit = event === 'login' ? 5 : isExpensiveRead ? 20 : event === 'getMessages' ? 60 : isMutation ? 30 : 120;
+        const windowMs = event === 'login' || isExpensiveRead || event === 'getMessages' ? 60_000 : isMutation ? 10_000 : 60_000;
+        if (!consumeLimit(eventLimits, event, limit, windowMs)) return next(new Error('Rate limit exceeded'));
+        return next();
+    });
+    socket.on('error', (error) => console.warn(`[Socket] ${socket.id}: ${error.message}`));
+
+    socket.on('login', async (credentials = {}) => {
+        const token = typeof credentials.token === 'string' ? credentials.token.trim() : '';
+        const isBot = credentials.isBot === true;
+        if (!token || token.length > 512 || /[\r\n\0]/.test(token)) {
+            return socket.emit('login-error', 'Invalid credentials');
+        }
         if (sessions.has(socket.id) || loginQueue.has(socket.id)) return;
 
         loginQueue.add(socket.id);
@@ -328,7 +513,7 @@ io.on('connection', (socket) => {
                         const token = client.token;
                         const isBot = !!client.user?.bot;
                         const authHeader = isBot ? `Bot ${token}` : token;
-                        const response = await fetch(`https://discord.com/api/v10/channels/${m.channelId}/messages?limit=100`, {
+                        const response = await discordFetch(`https://discord.com/api/v10/channels/${m.channelId}/messages?limit=100`, {
                             headers: { 'Authorization': authHeader }
                         });
                         if (response.ok) {
@@ -338,7 +523,7 @@ io.on('connection', (socket) => {
                                 // If not found in batch, try again after a short delay
                                 if (!raw) {
                                     await new Promise(r => setTimeout(r, 500));
-                                    const retry = await fetch(`https://discord.com/api/v10/channels/${m.channelId}/messages?limit=100`, {
+                                    const retry = await discordFetch(`https://discord.com/api/v10/channels/${m.channelId}/messages?limit=100`, {
                                         headers: { 'Authorization': authHeader }
                                     });
                                     if (retry.ok) {
@@ -362,7 +547,7 @@ io.on('connection', (socket) => {
                         const token = client.token;
                         const isBot = !!client.user?.bot;
                         const authHeader = isBot ? `Bot ${token}` : token;
-                        const response = await fetch(`https://discord.com/api/v10/channels/${m.channelId}/messages?limit=100`, {
+                        const response = await discordFetch(`https://discord.com/api/v10/channels/${m.channelId}/messages?limit=100`, {
                             headers: { 'Authorization': authHeader }
                         });
                         if (response.ok) {
@@ -415,11 +600,14 @@ io.on('connection', (socket) => {
             await client.login(token);
         } catch (e) {
             loginQueue.delete(socket.id);
-            socket.emit('login-error', e.message);
+            console.warn(`[Auth] Login failed: ${e.message}`);
+            socket.emit('login-error', 'Login failed');
+            try { client.destroy(); } catch { }
         }
     });
 
     socket.on('getGuilds', (cb) => {
+        cb = safeAck(cb);
         const client = sessions.get(socket.id);
         if (!client) return cb([]);
         cb(client.guilds.cache.map(g => ({
@@ -432,12 +620,19 @@ io.on('connection', (socket) => {
     });
 
     socket.on('getChannels', async (guildId, cb) => {
+        cb = safeAck(cb);
         const client = sessions.get(socket.id);
         if (!client) return cb([]);
+        if (guildId !== '@me' && !isSnowflake(guildId)) return cb([]);
         socket.currentGuildId = guildId;
         if (guildId === '@me') {
-            const dms = await getDMChannels(client);
-            return cb([{ id: "dms", name: "ダイレクトメッセージ", channels: dms }]);
+            try {
+                const dms = await getDMChannels(client);
+                return cb([{ id: "dms", name: "ダイレクトメッセージ", channels: dms }]);
+            } catch (error) {
+                console.warn('GetChannels Error:', error.message);
+                return cb([]);
+            }
         }
         const guild = client.guilds.cache.get(guildId);
         if (!guild) return cb([]);
@@ -445,6 +640,7 @@ io.on('connection', (socket) => {
     });
 
     socket.on('getFriends', async (cb) => {
+        cb = safeAck(cb);
         const client = sessions.get(socket.id);
         if (!client) return cb([]);
         try {
@@ -456,8 +652,9 @@ io.on('connection', (socket) => {
     });
 
     socket.on('getGuildEmojis', (guildId, cb) => {
+        cb = safeAck(cb);
         const client = sessions.get(socket.id);
-        if (!client || guildId === '@me') return cb([]);
+        if (!client || guildId === '@me' || !isSnowflake(guildId)) return cb([]);
         const guild = client.guilds.cache.get(guildId);
         if (!guild) return cb([]);
         cb(guild.emojis.cache.map((emoji) => ({
@@ -469,8 +666,9 @@ io.on('connection', (socket) => {
     });
 
     socket.on('getGuildStickers', async (guildId, cb) => {
+        cb = safeAck(cb);
         const client = sessions.get(socket.id);
-        if (!client || guildId === '@me') return cb([]);
+        if (!client || guildId === '@me' || !isSnowflake(guildId)) return cb([]);
         const guild = client.guilds.cache.get(guildId);
         if (!guild) return cb([]);
         try {
@@ -480,8 +678,9 @@ io.on('connection', (socket) => {
     });
 
     socket.on('getGuildRoles', async (guildId, cb) => {
+        cb = safeAck(cb);
         const client = sessions.get(socket.id);
-        if (!client || guildId === '@me') return cb([]);
+        if (!client || guildId === '@me' || !isSnowflake(guildId)) return cb([]);
         const guild = client.guilds.cache.get(guildId);
         if (!guild) return cb([]);
         try {
@@ -496,10 +695,12 @@ io.on('connection', (socket) => {
     });
 
     socket.on('getMessages', async (data, cb) => {
+        cb = safeAck(cb);
         const client = sessions.get(socket.id);
         if (!client) return cb([]);
-        const channelId = typeof data === 'string' ? data : data.channelId;
-        const before = typeof data === 'object' ? data.before : null;
+        const channelId = typeof data === 'string' ? data : data?.channelId;
+        const before = isPlainObject(data) ? data.before : null;
+        if (!isSnowflake(channelId) || (before && !isSnowflake(before))) return cb([]);
         socket.currentChannelId = channelId;
         try {
             const ch = await client.channels.fetch(channelId);
@@ -514,7 +715,7 @@ io.on('connection', (socket) => {
                 if (before) apiUrl += `&before=${before}`;
                 const isBot = !!client.user?.bot;
                 const authHeader = isBot ? `Bot ${token}` : token;
-                const response = await fetch(apiUrl, {
+                const response = await discordFetch(apiUrl, {
                     headers: { 'Authorization': authHeader }
                 });
                 if (response.ok) {
@@ -536,23 +737,22 @@ io.on('connection', (socket) => {
     });
 
     socket.on('sendMessage', async (d, cb = () => { }) => {
+        cb = safeAck(cb);
         const client = sessions.get(socket.id);
         if (!client) return cb({ ok: false, error: 'Not logged in' });
+        if (!isPlainObject(d) || !isSnowflake(d.channelId)) return cb(publicError('Invalid request'));
         try {
             const ch = await client.channels.fetch(d.channelId);
             if (!ch) return cb({ ok: false, error: 'Channel not found' });
 
-            const files = Array.isArray(d.files) ? d.files.map((file) => {
-                const data = String(file.data || '');
-                const base64 = data.includes(',') ? data.split(',').pop() : data;
-                const attachment = Buffer.from(base64, 'base64');
-                return {
-                    attachment,
-                    name: file.name || 'attachment',
-                    description: file.name || 'attachment'
-                };
-            }).filter(file => file.attachment.length > 0) : [];
+            if (d.files !== undefined && !Array.isArray(d.files)) return cb(publicError('Invalid attachments'));
+            if ((d.files?.length || 0) > MAX_FILES) return cb(publicError(`Up to ${MAX_FILES} files are allowed`));
+            const files = (d.files || []).map(parseAttachment);
+            if (files.reduce((sum, file) => sum + file.attachment.length, 0) > MAX_TOTAL_FILE_BYTES) {
+                return cb(publicError('Attachments are too large'));
+            }
 
+            if (d.reply?.messageId && !isSnowflake(d.reply.messageId)) return cb(publicError('Invalid reply'));
             const replyOptions = d.reply?.messageId ? {
                 reply: {
                     messageReference: d.reply.messageId,
@@ -562,8 +762,10 @@ io.on('connection', (socket) => {
                     repliedUser: d.reply.mention !== false
                 }
             } : {};
-            const content = String(d.content || '').trim();
-            const stickers = Array.isArray(d.stickers) ? d.stickers.filter(Boolean) : [];
+            if (d.content !== undefined && typeof d.content !== 'string') return cb(publicError('Invalid message'));
+            if ((d.content || '').length > MAX_MESSAGE_LENGTH) return cb(publicError('Message is too long'));
+            const content = cleanText(d.content || '', MAX_MESSAGE_LENGTH).trim();
+            const stickers = Array.isArray(d.stickers) ? d.stickers.filter(isSnowflake).slice(0, 3) : [];
             const payload = { ...replyOptions };
             if (files.length > 0) payload.files = files;
             if (stickers.length > 0) payload.stickers = stickers;
@@ -573,31 +775,100 @@ io.on('connection', (socket) => {
             await ch.send(payload);
             return cb({ ok: true, files: files.length, stickers: stickers.length });
         } catch (e) {
-            console.error('SendMessage Error:', e);
-            cb({ ok: false, error: e.message || String(e) });
+            console.error('SendMessage Error:', e.message);
+            cb(publicError(e.message === 'invalid_attachment' ? 'Invalid attachment' : 'Message could not be sent'));
+        }
+    });
+
+    socket.on('getUserProfile', async (payload = {}, cb = () => {}) => {
+        cb = safeAck(cb);
+        const { userId, guildId } = isPlainObject(payload) ? payload : {};
+        const client = sessions.get(socket.id);
+        if (!client) return cb({ error: 'Not logged in' });
+        if (!isSnowflake(userId) || (guildId && guildId !== '@me' && !isSnowflake(guildId))) return cb({ error: 'Invalid request' });
+
+        try {
+            let user = client.users.cache.get(userId);
+            if (!user) {
+                user = await Promise.race([
+                    client.users.fetch(userId),
+                    new Promise((_, reject) => setTimeout(() => reject(new Error('User lookup timed out')), 4000))
+                ]);
+            }
+
+            const guild = guildId && guildId !== '@me' ? client.guilds.cache.get(guildId) : null;
+            let member = guild?.members?.cache?.get(userId) || null;
+            if (guild && !member) {
+                try {
+                    member = await Promise.race([
+                        guild.members.fetch(userId),
+                        new Promise((resolve) => setTimeout(() => resolve(null), 3000))
+                    ]);
+                } catch { }
+            }
+
+            let apiProfile = null;
+            try {
+                apiProfile = await Promise.race([
+                    client.api.users(userId).profile.get({ query: { with_mutual_guilds: false, with_mutual_friends_count: false } }),
+                    new Promise((resolve) => setTimeout(() => resolve(null), 3500))
+                ]);
+            } catch { }
+
+            const profileUser = apiProfile?.user || user;
+            const profileData = apiProfile?.user_profile || apiProfile?.userProfile || {};
+            const guildProfile = apiProfile?.guild_member_profile || apiProfile?.guildMemberProfile || {};
+            const presence = member?.presence || user.presence || client.presence?.cache?.get?.(userId) || client.presences?.cache?.get?.(userId);
+            const bannerHash = profileData.banner || profileUser?.banner;
+            const banner = bannerHash
+                ? `https://cdn.discordapp.com/banners/${userId}/${bannerHash}.${String(bannerHash).startsWith('a_') ? 'gif' : 'png'}?size=1024`
+                : (typeof user.bannerURL === 'function' ? user.bannerURL({ dynamic: true, size: 1024 }) : null);
+
+            cb({
+                id: user.id,
+                username: user.username,
+                globalName: user.globalName || user.global_name || profileUser?.global_name,
+                displayName: getUserDisplayName(user, member),
+                avatar: member?.avatarURL?.({ dynamic: true, size: 512 }) || getUserAvatar(user, { dynamic: true, format: 'png', size: 512 }),
+                banner,
+                accentColor: profileData.accent_color || profileData.accentColor || user.hexAccentColor || null,
+                bio: guildProfile.bio || profileData.bio || '',
+                pronouns: guildProfile.pronouns || profileData.pronouns || '',
+                status: presence?.status || 'offline',
+                createdAt: user.createdTimestamp || snowflakeToTimestamp(user.id),
+                joinedAt: member?.joinedTimestamp || null,
+                bot: Boolean(user.bot),
+                roles: member?.roles?.cache
+                    ? member.roles.cache
+                        .filter((role) => role.id !== guild?.id)
+                        .sort((a, b) => b.position - a.position)
+                        .map((role) => ({ id: role.id, name: role.name, color: role.hexColor }))
+                    : []
+            });
+        } catch (e) {
+            console.warn('GetUserProfile Error:', e.message);
+            cb({ error: 'Failed to load profile' });
         }
     });
 
     socket.on('getUserInfo', async (userId, cb) => {
+        cb = safeAck(cb);
         const client = sessions.get(socket.id);
         if (!client) return cb({ error: 'Not logged in' });
+        if (!isSnowflake(userId)) return cb({ error: 'Invalid request' });
 
         try {
             const user = await client.users.fetch(userId, { force: true });
 
             let profileData = {};
-            let rawApiProfile = null;
             if (typeof user.fetchProfile === 'function') {
                 try {
-                    rawApiProfile = await client.api.users(userId).profile.get({ query: { with_mutual_guilds: true } });
                     const profile = await user.fetchProfile();
                     profileData = {
                         bio: profile.bio,
                         pronouns: profile.pronouns,
-                        connectedAccounts: profile.connectedAccounts,
                         premiumSince: profile.premiumSinceTimestamp,
                         premiumType: profile.premiumType,
-                        mutualGuilds: profile.mutualGuilds?.map(g => ({ id: g.id, nick: g.nick })),
                         themeColors: profile.themeColors
                     };
                 } catch (e) { }
@@ -606,23 +877,19 @@ io.on('connection', (socket) => {
 
             let serverProfiles = [];
             for (const guild of client.guilds.cache.values()) {
-                try {
-                    const member = await guild.members.fetch({ user: userId, force: true });
-                    if (member) {
-                        serverProfiles.push({
-                            guildId: guild.id,
-                            guildName: guild.name,
-                            nickname: member.nickname,
-                            displayName: member.displayName,
-                            roles: member.roles.cache.map(r => ({ id: r.id, name: r.name, color: r.hexColor })),
-                            joinedAt: member.joinedTimestamp,
-                            premiumSince: member.premiumSinceTimestamp,
-                            guildAvatarURL: member.avatarURL ? member.avatarURL({ dynamic: true, size: 1024 }) : null,
-                            communicationDisabledUntil: member.communicationDisabledUntilTimestamp,
-                            permissions: member.permissions.toArray()
-                        });
-                    }
-                } catch (e) {
+                const member = guild.members?.cache?.get(userId);
+                if (member) {
+                    serverProfiles.push({
+                        guildId: guild.id,
+                        guildName: guild.name,
+                        nickname: member.nickname,
+                        displayName: member.displayName,
+                        roles: member.roles.cache.map(r => ({ id: r.id, name: r.name, color: r.hexColor })),
+                        joinedAt: member.joinedTimestamp,
+                        premiumSince: member.premiumSinceTimestamp,
+                        guildAvatarURL: member.avatarURL ? member.avatarURL({ dynamic: true, size: 1024 }) : null,
+                        communicationDisabledUntil: member.communicationDisabledUntilTimestamp
+                    });
                 }
             }
 
@@ -640,50 +907,58 @@ io.on('connection', (socket) => {
                 flags: user.flags ? user.flags.toArray() : [],
                 createdAt: user.createdTimestamp,
                 ...profileData,
-                rawApiProfile,
                 serverProfiles
             };
             cb(data);
         } catch (e) {
-            cb({ error: e.message });
+            console.warn('GetUserInfo Error:', e.message);
+            cb({ error: 'Failed to load profile' });
         }
     });
 
     socket.on('addReaction', async (data, cb = () => {}) => {
+        cb = safeAck(cb);
         const client = sessions.get(socket.id);
         if (!client) return cb({ ok: false, error: 'Not logged in' });
+        if (!isPlainObject(data) || !isSnowflake(data.channelId) || !isSnowflake(data.messageId) || typeof data.emoji !== 'string' || !data.emoji || data.emoji.length > 128) {
+            return cb(publicError('Invalid request'));
+        }
         try {
             const token = client.token;
             const isBot = !!client.user?.bot;
             const authHeader = isBot ? `Bot ${token}` : token;
             const emojiParam = encodeURIComponent(data.emoji);
-            const response = await fetch(
+            const response = await discordFetch(
                 `https://discord.com/api/v10/channels/${data.channelId}/messages/${data.messageId}/reactions/${emojiParam}/@me`,
                 { method: 'PUT', headers: { 'Authorization': authHeader } }
             );
             cb({ ok: response.ok || response.status === 204 });
         } catch (e) {
-            console.error('AddReaction Error:', e);
-            cb({ ok: false, error: e.message });
+            console.error('AddReaction Error:', e.message);
+            cb(publicError('Reaction could not be added'));
         }
     });
 
     socket.on('removeReaction', async (data, cb = () => {}) => {
+        cb = safeAck(cb);
         const client = sessions.get(socket.id);
         if (!client) return cb({ ok: false, error: 'Not logged in' });
+        if (!isPlainObject(data) || !isSnowflake(data.channelId) || !isSnowflake(data.messageId) || typeof data.emoji !== 'string' || !data.emoji || data.emoji.length > 128) {
+            return cb(publicError('Invalid request'));
+        }
         try {
             const token = client.token;
             const isBot = !!client.user?.bot;
             const authHeader = isBot ? `Bot ${token}` : token;
             const emojiParam = encodeURIComponent(data.emoji);
-            const response = await fetch(
+            const response = await discordFetch(
                 `https://discord.com/api/v10/channels/${data.channelId}/messages/${data.messageId}/reactions/${emojiParam}/@me`,
                 { method: 'DELETE', headers: { 'Authorization': authHeader } }
             );
             cb({ ok: response.ok || response.status === 204 });
         } catch (e) {
-            console.error('RemoveReaction Error:', e);
-            cb({ ok: false, error: e.message });
+            console.error('RemoveReaction Error:', e.message);
+            cb(publicError('Reaction could not be removed'));
         }
     });
 
@@ -692,8 +967,10 @@ io.on('connection', (socket) => {
     });
 
     socket.on('getSlashCommands', async (guildId, cb) => {
+        cb = safeAck(cb);
         const client = sessions.get(socket.id);
         if (!client) return cb([]);
+        if (guildId !== '@me' && !isSnowflake(guildId)) return cb([]);
         try {
             const token = client.token;
             const isBot = !!client.user?.bot;
@@ -707,14 +984,15 @@ io.on('connection', (socket) => {
                 } else {
                     apiUrl = `https://discord.com/api/v10/users/@me/applications`;
                 }
-                const response = await fetch(apiUrl, { headers: { 'Authorization': authHeader } });
+                const response = await discordFetch(apiUrl, { headers: { 'Authorization': authHeader } });
                 if (response.ok) {
                     const data = await response.json();
                     if (data.applications) {
                         for (const app of data.applications) {
                             if (app.id) {
                                 try {
-                                    const cmdsResponse = await fetch(`https://discord.com/api/v10/applications/${app.id}/guilds/${guildId}/commands`, { headers: { 'Authorization': authHeader } });
+                                    if (!isSnowflake(app.id) || !isSnowflake(guildId)) continue;
+                                    const cmdsResponse = await discordFetch(`https://discord.com/api/v10/applications/${app.id}/guilds/${guildId}/commands`, { headers: { 'Authorization': authHeader } });
                                     if (cmdsResponse.ok) {
                                         const cmds = await cmdsResponse.json();
                                         if (Array.isArray(cmds)) {
@@ -778,8 +1056,12 @@ io.on('connection', (socket) => {
     });
 
     socket.on('sendSlashCommand', async (data, cb = () => {}) => {
+        cb = safeAck(cb);
         const client = sessions.get(socket.id);
         if (!client) return cb({ ok: false, error: 'Not logged in' });
+        if (!isPlainObject(data) || !isSnowflake(data.channelId) || !isSnowflake(data.commandId) || !COMMAND_NAME_RE.test(data.commandName || '') || (data.guildId && data.guildId !== '@me' && !isSnowflake(data.guildId))) {
+            return cb(publicError('Invalid request'));
+        }
         try {
             const ch = await client.channels.fetch(data.channelId);
             if (!ch) return cb({ ok: false, error: 'Channel not found' });
@@ -800,20 +1082,31 @@ io.on('connection', (socket) => {
                 return cb({ ok: true });
             }
         } catch (e) {
-            console.error('SendSlashCommand Error:', e);
-            cb({ ok: false, error: e.message });
+            console.error('SendSlashCommand Error:', e.message);
+            cb(publicError('Command could not be sent'));
         }
     });
 
     socket.on('interaction', async (data, cb = () => {}) => {
+        cb = safeAck(cb);
         const client = sessions.get(socket.id);
         if (!client) return cb({ ok: false, error: 'Not logged in' });
+        if (!isPlainObject(data) || !['modal', 'button', 'select'].includes(data.type) || !isSnowflake(data.channelId) || (data.guildId && data.guildId !== '@me' && !isSnowflake(data.guildId))) {
+            return cb(publicError('Invalid request'));
+        }
         try {
             const token = client.token;
             const isBot = !!client.user?.bot;
             const authHeader = isBot ? `Bot ${token}` : token;
 
             if (data.type === 'modal') {
+                if ((data.applicationId && !isSnowflake(data.applicationId)) || typeof data.customId !== 'string' || data.customId.length > 100 || !isPlainObject(data.values) || Object.keys(data.values).length > 25) {
+                    return cb(publicError('Invalid interaction'));
+                }
+                const modalValues = Object.entries(data.values);
+                if (modalValues.some(([id, value]) => id.length > 100 || typeof value !== 'string' || value.length > 4000)) {
+                    return cb(publicError('Invalid interaction'));
+                }
                 const sessionId = `session_${Date.now()}_${Math.random().toString(36).slice(2)}`;
                 const body = {
                     type: 6,
@@ -823,14 +1116,14 @@ io.on('connection', (socket) => {
                     session_id: sessionId,
                     data: {
                         custom_id: data.customId,
-                        components: Object.entries(data.values || {}).map(([id, value]) => ({
+                        components: modalValues.map(([id, value]) => ({
                             type: 1,
                             components: [{ type: 4, custom_id: id, value }]
                         }))
                     }
                 };
 
-                const response = await fetch(`https://discord.com/api/v10/interactions`, {
+                const response = await discordFetch(`https://discord.com/api/v10/interactions`, {
                     method: 'POST',
                     headers: { 'Authorization': authHeader, 'Content-Type': 'application/json' },
                     body: JSON.stringify(body)
@@ -839,9 +1132,16 @@ io.on('connection', (socket) => {
                 return cb({ ok: response.ok || response.status === 204 });
             }
 
+            if (!isSnowflake(data.messageId) || typeof data.customId !== 'string' || !data.customId || data.customId.length > 100) {
+                return cb(publicError('Invalid interaction'));
+            }
+            if (data.values !== undefined && (!Array.isArray(data.values) || data.values.length > 25 || data.values.some((value) => typeof value !== 'string' || value.length > 100))) {
+                return cb(publicError('Invalid interaction'));
+            }
+
             let applicationId = null;
             try {
-                const msgResponse = await fetch(`https://discord.com/api/v10/channels/${data.channelId}/messages?limit=50`, {
+                const msgResponse = await discordFetch(`https://discord.com/api/v10/channels/${data.channelId}/messages?limit=50`, {
                     headers: { 'Authorization': authHeader }
                 });
                 if (msgResponse.ok) {
@@ -874,7 +1174,7 @@ io.on('connection', (socket) => {
                 }
             };
 
-            const interactionResponse = await fetch(`https://discord.com/api/v10/interactions`, {
+            const interactionResponse = await discordFetch(`https://discord.com/api/v10/interactions`, {
                 method: 'POST',
                 headers: { 'Authorization': authHeader, 'Content-Type': 'application/json' },
                 body: JSON.stringify(body)
@@ -896,14 +1196,24 @@ io.on('connection', (socket) => {
                 return cb({ ok: true, deferred: true });
             }
 
-            const errorData = await interactionResponse.json().catch(() => ({}));
-            console.error('Interaction Error Response:', errorData);
-            return cb({ ok: false, error: errorData.message || 'Interaction failed' });
+            console.error('Interaction Error Response:', interactionResponse.status);
+            return cb(publicError('Interaction failed'));
         } catch (e) {
-            console.error('Interaction Error:', e);
-            cb({ ok: false, error: e.message });
+            console.error('Interaction Error:', e.message);
+            cb(publicError('Interaction failed'));
         }
     });
 });
 
-server.listen(8000, () => console.log('Backend Online: 8000'));
+app.use((req, res) => res.status(404).json({ error: 'Not found' }));
+app.use((error, req, res, next) => {
+    console.error('HTTP Error:', error.message);
+    if (res.headersSent) return next(error);
+    return res.status(500).json({ error: 'Internal server error' });
+});
+
+server.requestTimeout = 15_000;
+server.headersTimeout = 10_000;
+server.keepAliveTimeout = 5_000;
+const port = Number.parseInt(process.env.PORT || '8000', 10);
+server.listen(port, '0.0.0.0', () => console.log(`Backend Online: ${port}`));

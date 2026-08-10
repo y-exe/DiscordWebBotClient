@@ -1,6 +1,6 @@
 import React, { useRef, useEffect, useState } from 'react';
-import twemoji from 'twemoji';
 import { getProxyUrl } from '../../utils/helpers';
+import TwemojiText from '../ui/TwemojiText';
 
 const ReactionList = ({ reactions, onReactionClick }) => {
   if (!reactions || reactions.length === 0) return null;
@@ -40,18 +40,7 @@ const ReactionButton = ({ reaction, onReactionClick }) => {
     if (emoji.id) {
       return <img src={getProxyUrl(emoji.url)} className="w-full h-full object-contain" alt={emoji.name} />;
     }
-    return (
-      <span
-        className="flex items-center justify-center w-full h-full"
-        dangerouslySetInnerHTML={{
-          __html: twemoji.parse(emoji.name, {
-            folder: 'svg',
-            ext: '.svg',
-            base: 'https://cdn.jsdelivr.net/gh/twitter/twemoji@14.0.2/assets/'
-          })
-        }}
-      />
-    );
+    return <TwemojiText className="flex items-center justify-center w-full h-full">{emoji.name}</TwemojiText>;
   };
 
   return (

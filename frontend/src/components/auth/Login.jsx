@@ -1,5 +1,5 @@
-import { useState, useEffect } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
+import { useState } from 'react';
+import { motion as Motion, AnimatePresence } from 'framer-motion';
 import { useNavigate } from 'react-router-dom';
 import MouseEffectCard from '../ui/MouseEffectCard';
 import { InteractiveHoverButton } from '../ui/InteractiveHoverButton';
@@ -15,11 +15,15 @@ const setCookie = (name, value, days) => {
 };
 
 const getCookie = (name) => {
-  const value = document.cookie.split('; ').reduce((r, v) => {
-    const parts = v.split('=');
-    return parts[0] === name ? decodeURIComponent(parts[1]) : r;
+  const value = document.cookie.split('; ').reduce((result, entry) => {
+    const parts = entry.split('=');
+    return parts[0] === name ? decodeURIComponent(parts.slice(1).join('=')) : result;
   }, '');
-  try { return JSON.parse(value || '[]'); } catch (e) { return []; }
+  try {
+    return JSON.parse(value || '[]');
+  } catch {
+    return [];
+  }
 };
 
 const containerVariants = { 
@@ -35,18 +39,16 @@ export default function Login() {
   const navigate = useNavigate();
   const [userToken, setUserToken] = useState("");
   const [botToken, setBotToken] = useState("");
-  const [history, setHistory] = useState([]);
-  const [showTokenHelp, setShowTokenHelp] = useState(false);
-
-  useEffect(() => {
+  const [history, setHistory] = useState(() => {
     const savedHistory = getCookie('discord-client-history');
-    if (Array.isArray(savedHistory)) setHistory(savedHistory);
-  }, []);
+    return Array.isArray(savedHistory) ? savedHistory : [];
+  });
+  const [showTokenHelp, setShowTokenHelp] = useState(false);
 
   const handleLogin = (token, isBot) => {
     if (!token.trim()) return;
     sessionStorage.setItem('current-session', JSON.stringify({ token: token.trim(), isBot }));
-    window.location.href = '/@me';
+    navigate('/@me');
   };
 
   const deleteHistory = (e, index) => {
@@ -68,58 +70,42 @@ export default function Login() {
         description="DiscordWebTokenClient ブラウザ上で動作する高速・軽量なDiscordクライアント トークンを使用してログインし、Bot,Userともに操作が可能です。"
         path="/login"
       />
-      <script type="application/ld+json">
-        {JSON.stringify({
-          "@context": "https://schema.org",
-          "@type": "SoftwareApplication",
-          "name": "Discord Web Token Client",
-          "operatingSystem": "Web",
-          "applicationCategory": "CommunicationApplication",
-          "offers": {
-            "@type": "Offer",
-            "price": "0",
-            "priceCurrency": "JPY"
-          },
-          "description": "ブラウザ上で動作する高速・軽量なDiscordクライアント トークンを使用してログインし、Bot,Userともに操作が可能です。"
-        })}
-      </script>
-
       <Header />
       <div className="flex-grow flex flex-col relative w-full overflow-hidden">
         <MouseEffectCard className="absolute inset-0 z-0 bg-transparent border-none rounded-none"><div className="w-full h-full"></div></MouseEffectCard>
         <main className="w-full max-w-5xl mx-auto flex flex-col items-center justify-center py-24 px-4 relative z-10">
-            <motion.div className="w-full flex flex-col items-center" variants={containerVariants} initial="hidden" animate="visible">
+            <Motion.div className="w-full flex flex-col items-center" variants={containerVariants} initial="hidden" animate="visible">
                 <div className="text-center mb-12">
-                    <motion.div variants={itemVariants} className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full border border-gray-200 dark:border-zinc-800 bg-white/80 dark:bg-zinc-900/80 backdrop-blur-sm shadow-sm mb-6">
+                    <Motion.div variants={itemVariants} className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full border border-gray-200 dark:border-zinc-800 bg-white/80 dark:bg-zinc-900/80 backdrop-blur-sm shadow-sm mb-6">
                         <FaDiscord className="text-[#5865F2]" /><span className="text-xs font-bold text-gray-600 dark:text-gray-300 tracking-wide font-ggsans">DISCORD</span>
-                    </motion.div>
-                    <motion.h2 variants={itemVariants} className="text-4xl md:text-5xl font-bold tracking-tight text-gray-900 dark:text-white mb-2 leading-tight font-google">高速軽量 Socket.io</motion.h2>
-                    <motion.h1 variants={itemVariants} className="text-4xl md:text-5xl font-bold tracking-tight text-transparent bg-clip-text bg-gradient-to-r from-[#5865F2] to-[#404EED] mb-6 leading-tight font-google">Discord Web Token Client</motion.h1>
-                    <motion.p variants={itemVariants} className="text-gray-500 dark:text-gray-400 max-w-xl mx-auto text-sm md:text-base leading-relaxed">
+                    </Motion.div>
+                    <Motion.h2 variants={itemVariants} className="text-4xl md:text-5xl font-bold tracking-tight text-gray-900 dark:text-white mb-2 leading-tight font-google">高速軽量 Socket.io</Motion.h2>
+                    <Motion.h1 variants={itemVariants} className="text-4xl md:text-5xl font-bold tracking-tight text-transparent bg-clip-text bg-gradient-to-r from-[#5865F2] to-[#404EED] mb-6 leading-tight font-google">Discord Web Token Client</Motion.h1>
+                    <Motion.p variants={itemVariants} className="text-gray-500 dark:text-gray-400 max-w-xl mx-auto text-sm md:text-base leading-relaxed">
                         Bot/UserのTokenをWebブラウザで動かせるオープンソースプロジェクトです。<br/>
                         軽量化や、複数アカウントのプレビュー確認などに最適です。
-                    </motion.p>
+                    </Motion.p>
                 </div>
 
                 {history.length > 0 && (
-                    <motion.div variants={itemVariants} className="w-full max-w-4xl mb-10 bg-white/90 dark:bg-zinc-900/90 backdrop-blur-sm border border-gray-200 dark:border-zinc-800 rounded-2xl shadow-lg p-6">
+                    <Motion.div variants={itemVariants} className="w-full max-w-4xl mb-10 bg-white/90 dark:bg-zinc-900/90 backdrop-blur-sm border border-gray-200 dark:border-zinc-800 rounded-2xl shadow-lg p-6">
                         <div className="flex items-center justify-between gap-3 mb-4">
                             <div className="flex items-center gap-2"><FaHistory className="text-gray-400" /><h3 className="text-xs font-bold text-gray-500 dark:text-gray-400 uppercase tracking-widest font-google">Login History</h3></div>
                             <NativeDelete buttonText="Clear All" confirmText="Confirm Clear" size="sm" onDelete={deleteAllHistory} />
                         </div>
                         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
                             {history.map((item, i) => (
-                                <div key={i} onClick={() => handleLogin(item.token, item.isBot)} className="relative bg-gray-50 dark:bg-zinc-800 border border-gray-200 dark:border-zinc-700 rounded-xl p-3 flex items-center gap-3 cursor-pointer hover:shadow-md hover:-translate-y-0.5 transition-all overflow-hidden group">
+                                <div key={item.id || i} onClick={() => handleLogin(item.token, item.isBot)} className="relative bg-gray-50 dark:bg-zinc-800 border border-gray-200 dark:border-zinc-700 rounded-xl p-3 flex items-center gap-3 cursor-pointer hover:shadow-md hover:-translate-y-0.5 transition-all overflow-hidden group">
                                     <div className="relative shrink-0"><img src={item.avatar || "https://cdn.discordapp.com/embed/avatars/0.png"} className="w-10 h-10 rounded-full object-cover bg-gray-200 dark:bg-zinc-700" alt={item.username || "User"} /><div className={`absolute -bottom-1 -right-1 w-4 h-4 rounded-full border-2 border-gray-50 dark:border-zinc-800/50 flex items-center justify-center text-[7px] ${item.isBot ? 'bg-[#5865F2]' : 'bg-gray-600'} text-white shadow-sm`}>{item.isBot ? <FaRobot /> : <FaUser />}</div></div>
                                     <div className="flex-1 min-w-0 text-left"><div className="font-bold text-gray-900 dark:text-gray-100 truncate text-sm">{item.username || "Unknown"}</div><div className="text-[10px] text-gray-500 dark:text-gray-400 font-mono truncate max-w-full">ID: {item.id}</div></div>
                                     <button onClick={(e) => deleteHistory(e, i)} className="text-gray-400 hover:text-red-500 dark:text-zinc-600 dark:hover:text-red-400 transition-colors p-2 opacity-100 absolute top-1 right-1 z-10" title="履歴から削除"><FaTrash size={12} /></button>
                                 </div>
                             ))}
                         </div>
-                    </motion.div>
+                    </Motion.div>
                 )}
 
-                <motion.div variants={itemVariants} className="w-full max-w-4xl shadow-2xl rounded-2xl overflow-hidden border border-gray-200 dark:border-zinc-800 bg-black text-white flex flex-col md:flex-row min-h-[380px]">
+                <Motion.div variants={itemVariants} className="w-full max-w-4xl shadow-2xl rounded-2xl overflow-hidden border border-gray-200 dark:border-zinc-800 bg-black text-white flex flex-col md:flex-row min-h-[380px]">
                     <div className="flex-1 p-8 md:p-10 border-b md:border-b-0 md:border-r border-zinc-800 flex flex-col items-center justify-center relative">
                         <div className="w-full max-w-xs text-center relative z-10">
                             <h3 className="text-xl font-bold mb-2 font-google">User Token</h3>
@@ -147,15 +133,15 @@ export default function Login() {
                             </div>
                         </div>
                     </div>
-                </motion.div>
-            </motion.div>
+                </Motion.div>
+            </Motion.div>
         </main>
       </div>
       <Footer />
       <AnimatePresence>
         {showTokenHelp && (
-          <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 bg-black/60 backdrop-blur-md z-[9999] flex items-center justify-center p-4 font-google" onClick={() => setShowTokenHelp(false)}>
-            <motion.div initial={{ scale: 0.95, y: 20 }} animate={{ scale: 1, y: 0 }} exit={{ scale: 0.95, y: 20 }} className="bg-white dark:bg-zinc-950 rounded-2xl p-6 md:p-8 max-w-2xl w-full relative shadow-2xl border border-gray-100 dark:border-zinc-800" onClick={e => e.stopPropagation()}>
+          <Motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 bg-black/60 backdrop-blur-md z-[9999] flex items-center justify-center p-4 font-google" onClick={() => setShowTokenHelp(false)}>
+            <Motion.div initial={{ scale: 0.95, y: 20 }} animate={{ scale: 1, y: 0 }} exit={{ scale: 0.95, y: 20 }} className="bg-white dark:bg-zinc-950 rounded-2xl p-6 md:p-8 max-w-2xl w-full relative shadow-2xl border border-gray-100 dark:border-zinc-800" onClick={e => e.stopPropagation()}>
               <button onClick={() => setShowTokenHelp(false)} className="absolute top-4 right-4 text-gray-400 hover:text-black dark:hover:text-white transition-colors cursor-pointer p-2 bg-gray-100 dark:bg-zinc-900 rounded-full font-google"><FaTimes size={16}/></button>
               <h3 className="text-2xl font-bold mb-6 text-gray-900 dark:text-white flex items-center gap-2 font-google"><FaDiscord className="text-[#5865F2]" />トークンの入手方法</h3>
               <div className="space-y-4 text-sm text-gray-600 dark:text-gray-300 leading-relaxed font-google">
@@ -166,8 +152,8 @@ export default function Login() {
                       <img src="/token.webp" alt="Discordのauthorizationヘッダーからトークンを確認する方法" width="600" height="300" className="rounded-lg max-h-[50vh] w-auto object-contain"/>
                   </div>
               </div>
-            </motion.div>
-          </motion.div>
+            </Motion.div>
+          </Motion.div>
         )}
       </AnimatePresence>
     </div>
