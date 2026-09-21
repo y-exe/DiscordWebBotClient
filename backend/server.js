@@ -194,7 +194,6 @@ const IMAGE_PROXY_HOSTS = new Set(
 );
 const MAX_PROXY_BYTES = 10 * 1024 * 1024;
 const ALLOWED_IMAGE_TYPES = new Set(['image/png', 'image/jpeg', 'image/gif', 'image/webp', 'image/avif']);
-// This limit protects the endpoint from abuse; CDN traffic is controlled below.
 const imageProxyLimiter = rateLimit({ windowMs: 60_000, limit: 10_000, standardHeaders: 'draft-8', legacyHeaders: false });
 const imageCache = new Map();
 const imageRequests = new Map();

@@ -6,8 +6,16 @@ import './material-web.js';
 import './index.css';
 import App from './App.jsx';
 import { initAnalytics } from './analytics.js';
+import { getFallbackProxyUrl } from './utils/helpers.js';
 
 initAnalytics();
+
+document.addEventListener('error', (event) => {
+  const image = event.target;
+  if (!(image instanceof HTMLImageElement)) return;
+  const fallback = getFallbackProxyUrl(image.currentSrc || image.src);
+  if (fallback && image.src !== fallback) image.src = fallback;
+}, true);
 
 class ErrorBoundary extends React.Component {
   constructor(props) {

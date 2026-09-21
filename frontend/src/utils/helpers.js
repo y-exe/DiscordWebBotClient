@@ -11,10 +11,17 @@ export const getProxyUrl = (url) => {
   if (typeof url !== 'string') return '';
   try {
     const parsed = new URL(url, window.location.origin);
-    if (parsed.protocol === 'https:' && PROXY_IMAGE_HOSTS.has(parsed.hostname.toLowerCase())) {
-      return `${API_URL}/api/image-proxy?url=${encodeURIComponent(parsed.href)}`;
-    }
     return parsed.protocol === 'https:' || parsed.protocol === 'http:' || parsed.protocol === 'blob:' ? parsed.href : '';
+  } catch {
+    return '';
+  }
+};
+
+export const getFallbackProxyUrl = (url) => {
+  try {
+    const parsed = new URL(url);
+    if (parsed.protocol !== 'https:' || !PROXY_IMAGE_HOSTS.has(parsed.hostname.toLowerCase())) return '';
+    return `${API_URL}/api/image-proxy?url=${encodeURIComponent(parsed.href)}`;
   } catch {
     return '';
   }
