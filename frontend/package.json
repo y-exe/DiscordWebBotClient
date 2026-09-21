@@ -5,7 +5,8 @@
   "type": "module",
   "scripts": {
     "dev": "next dev --hostname 0.0.0.0 --port 5173",
-    "build": "next build",
+    "build": "opennextjs-cloudflare build",
+    "build:next": "next build",
     "lint": "eslint .",
     "preview": "opennextjs-cloudflare build && opennextjs-cloudflare preview",
     "start": "next start",
