@@ -52,7 +52,14 @@ export const loadAppSettings = () => {
   }
 };
 
-const applyAppSettings = (settings) => {
+export const saveAppTheme = (theme) => {
+  if (!validValues.theme.includes(theme)) return;
+  try {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify({ ...loadAppSettings(), theme }));
+  } catch { return; }
+};
+
+export const applyAppSettings = (settings) => {
   const root = document.documentElement;
   root.dataset.appAccent = settings.accent;
   root.dataset.appBlur = String(settings.blur);

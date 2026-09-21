@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { motion as Motion, AnimatePresence } from 'framer-motion';
+import { motion as Motion, AnimatePresence, useReducedMotion } from 'framer-motion';
 import MouseEffectCard from '../ui/MouseEffectCard';
 import { InteractiveHoverButton } from '../ui/InteractiveHoverButton';
 import { FaUser, FaRobot, FaDiscord, FaTrash, FaQuestionCircle, FaTimes, FaArrowRight, FaHistory } from 'react-icons/fa';
@@ -17,16 +17,22 @@ import {
   stagePendingLogin,
 } from '../../utils/tokenVault';
 
-const containerVariants = { 
-  hidden: { opacity: 0 }, 
-  visible: { opacity: 1, transition: { staggerChildren: 0.1, delayChildren: 0.1 } } 
+const containerVariants = {
+  hidden: {},
+  visible: { transition: { staggerChildren: 0.085, delayChildren: 0.12 } }
 };
-const itemVariants = { 
-  hidden: { opacity: 0, y: 15 }, 
-  visible: { opacity: 1, y: 0, transition: { type: "spring", stiffness: 50, damping: 20 } } 
+const itemVariants = {
+  hidden: { opacity: 0, y: 30, scale: 0.985 },
+  visible: { opacity: 1, y: 0, scale: 1, transition: { duration: 0.65, ease: [0.16, 1, 0.3, 1] } }
+};
+const reducedItemVariants = {
+  hidden: { opacity: 0 },
+  visible: { opacity: 1, transition: { duration: 0.15 } }
 };
 
 export default function Login() {
+  const reduceMotion = useReducedMotion();
+  const entranceVariants = reduceMotion ? reducedItemVariants : itemVariants;
   const [userToken, setUserToken] = useState("");
   const [botToken, setBotToken] = useState("");
   const [history, setHistory] = useState(loadAccountHistory);
@@ -101,14 +107,14 @@ export default function Login() {
       <div className="flex-grow flex flex-col relative w-full overflow-hidden">
         <MouseEffectCard className="absolute inset-0 z-0 bg-transparent border-none rounded-none"><div className="w-full h-full"></div></MouseEffectCard>
         <main className="w-full max-w-5xl mx-auto flex flex-col items-center justify-center py-24 px-4 relative z-10">
-            <Motion.div className="w-full flex flex-col items-center" variants={containerVariants} initial="hidden" animate="visible">
+            <Motion.div className="w-full flex flex-col items-center" variants={reduceMotion ? undefined : containerVariants} initial="hidden" animate="visible">
                 <div className="text-center mb-12">
-                    <Motion.div variants={itemVariants} className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full border border-gray-200 dark:border-zinc-800 bg-white/80 dark:bg-zinc-900/80 backdrop-blur-sm shadow-sm mb-6">
+                    <Motion.div variants={entranceVariants} className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full border border-gray-200 dark:border-zinc-800 bg-white/80 dark:bg-zinc-900/80 backdrop-blur-sm shadow-sm mb-6">
                         <FaDiscord className="text-[#5865F2]" /><span className="text-xs font-bold text-gray-600 dark:text-gray-300 tracking-wide font-ggsans">DISCORD</span>
                     </Motion.div>
-                    <Motion.h2 variants={itemVariants} className="text-4xl md:text-5xl font-bold tracking-tight text-gray-900 dark:text-white mb-2 leading-tight font-google">高速軽量 Socket.io</Motion.h2>
-                    <Motion.h1 variants={itemVariants} className="text-4xl md:text-5xl font-bold tracking-tight text-transparent bg-clip-text bg-gradient-to-r from-[#5865F2] to-[#404EED] mb-6 leading-tight font-google">Discord Web Token Client</Motion.h1>
-                    <Motion.p variants={itemVariants} className="text-gray-500 dark:text-gray-400 max-w-xl mx-auto text-sm md:text-base leading-relaxed">
+                    <Motion.h2 variants={entranceVariants} className="text-4xl md:text-5xl font-bold tracking-tight text-gray-900 dark:text-white mb-2 leading-tight font-google">高速軽量 Socket.io</Motion.h2>
+                    <Motion.h1 variants={entranceVariants} className="text-4xl md:text-5xl font-bold tracking-tight text-transparent bg-clip-text bg-gradient-to-r from-[#5865F2] to-[#404EED] mb-6 leading-tight font-google">Discord Web Token Client</Motion.h1>
+                    <Motion.p variants={entranceVariants} className="text-gray-500 dark:text-gray-400 max-w-xl mx-auto text-sm md:text-base leading-relaxed">
                         Bot/UserのTokenをWebブラウザで動かせるオープンソースプロジェクトです。<br/>
                         軽量化や、複数アカウントのプレビュー確認などに最適です。
                     </Motion.p>
@@ -117,7 +123,7 @@ export default function Login() {
                 {loginError && <p role="alert" className="mb-6 text-sm font-bold text-red-500">{loginError}</p>}
 
                 {history.length > 0 && (
-                    <Motion.div variants={itemVariants} className="w-full max-w-4xl mb-10 bg-white/90 dark:bg-zinc-900/90 backdrop-blur-sm border border-gray-200 dark:border-zinc-800 rounded-2xl shadow-lg p-6">
+                    <Motion.div variants={entranceVariants} className="w-full max-w-4xl mb-10 bg-white/90 dark:bg-zinc-900/90 backdrop-blur-sm border border-gray-200 dark:border-zinc-800 rounded-2xl shadow-lg p-6">
                         <div className="flex items-center justify-between gap-3 mb-4">
                             <div className="flex items-center gap-2"><FaHistory className="text-gray-400" /><h3 className="text-xs font-bold text-gray-500 dark:text-gray-400 uppercase tracking-widest font-google">Login History</h3></div>
                             <NativeDelete buttonText="Clear All" confirmText="Confirm Clear" size="sm" onDelete={deleteAllHistory} />
@@ -134,7 +140,7 @@ export default function Login() {
                     </Motion.div>
                 )}
 
-                <Motion.div variants={itemVariants} className="w-full max-w-4xl shadow-2xl rounded-2xl overflow-hidden border border-gray-200 dark:border-zinc-800 bg-black text-white flex flex-col md:flex-row min-h-[380px]">
+                <Motion.div variants={entranceVariants} className="w-full max-w-4xl shadow-2xl rounded-2xl overflow-hidden border border-gray-200 dark:border-zinc-800 bg-black text-white flex flex-col md:flex-row min-h-[380px]">
                     <div className="flex-1 p-8 md:p-10 border-b md:border-b-0 md:border-r border-zinc-800 flex flex-col items-center justify-center relative">
                         <div className="w-full max-w-xs text-center relative z-10">
                             <h3 className="text-xl font-bold mb-2 font-google">User Token</h3>

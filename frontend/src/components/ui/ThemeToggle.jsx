@@ -5,6 +5,7 @@ import { Monitor, Moon, Sun } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { useTheme } from 'next-themes';
 import { cn } from '../../lib/utils';
+import { saveAppTheme } from '../../hooks/useAppSettings';
 
 const THEME_OPTIONS = [
 	{
@@ -53,7 +54,7 @@ export function ToggleTheme() {
 					role="radio"
 					aria-checked={theme === option.value}
 					aria-label={`Switch to ${option.label} theme`}
-					onClick={() => setTheme(option.value)}
+					onClick={() => { saveAppTheme(option.value); setTheme(option.value); }}
 				>
 					{theme === option.value && (
 						<motion.div

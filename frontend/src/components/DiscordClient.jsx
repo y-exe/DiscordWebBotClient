@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { useTheme } from 'next-themes';
 import { FaBell, FaChevronLeft, FaHashtag, FaInbox, FaMagnifyingGlass, FaXmark } from 'react-icons/fa6';
@@ -14,6 +14,7 @@ import MessageEmbed from './chat/MessageEmbed';
 import ForumView from './chat/ForumView';
 import FriendsView from './home/FriendsView';
 import ImageViewer from './chat/ImageViewer';
+import ChatLoadingContent from './chat/ChatLoadingContent';
 import UserPopout from './overlay/UserPopout';
 import MessageContextMenu from './overlay/MessageContextMenu';
 import MessageToolbar from './chat/MessageToolbar';
@@ -39,6 +40,9 @@ const MessageAuthorName = ({ name, color, onClick }) => {
         </span>
     );
 };
+
+const isReadableChannel = (channel) => !['GUILD_VOICE', 'GUILD_STAGE_VOICE', 2, 13].includes(channel.type);
+const lastChannelKey = (guildId) => `discord-last-channel:${guildId}`;
 
 const DraftUploadMessage = ({ draft, user, channels, roles, guildId, navigate, guilds }) => {
     if (!draft) return null;
@@ -161,7 +165,7 @@ export default function DiscordClient({ socket, user }) {
     const [guildEmojis, setGuildEmojis] = useState([]);
     const [guildStickers, setGuildStickers] = useState([]);
     const [guildRoles, setGuildRoles] = useState([]);
-    const [showMobileChat, setShowMobileChat] = useState(!!paramChannelId);
+    const showMobileChat = Boolean(paramChannelId);
 
     const [replyingTo, setReplyingTo] = useState(null);
     const [contextMenu, setContextMenu] = useState(null);
@@ -173,18 +177,76 @@ export default function DiscordClient({ socket, user }) {
     const [hoveredMessageId, setHoveredMessageId] = useState(null);
     const [joinedVoiceChannelId] = useState(null);
     const [loadingOlder, setLoadingOlder] = useState(false);
-    const [loadingChannelId, setLoadingChannelId] = useState(null);
+    const [loadedChannelId, setLoadedChannelId] = useState(null);
+    const [loadingChannels, setLoadingChannels] = useState(true);
+    const [channelsGuildId, setChannelsGuildId] = useState(null);
+    const [isDesktop, setIsDesktop] = useState(() => window.matchMedia('(min-width: 768px)').matches);
     const [settingsOpen, setSettingsOpen] = useState(false);
     const [uploadDraft, setUploadDraft] = useState(null);
     const [friends, setFriends] = useState([]);
-    const [friendsLoading, setFriendsLoading] = useState(false);
+    const [friendsLoading, setFriendsLoading] = useState(paramGuildId === '@me' && paramChannelId === 'friends');
     const [stickerPreview, setStickerPreview] = useState(null);
     const [slashCommands, setSlashCommands] = useState([]);
     const [activeModal, setActiveModal] = useState(null);
+    const [isClosingMobileChat, setIsClosingMobileChat] = useState(false);
 
     const scrollRef = useRef(null);
+    const contentShellRef = useRef(null);
+    const closeAnimationRef = useRef(null);
+    const closePendingRef = useRef(false);
     const messagesEndRef = useRef(null);
     const isFriendsRoute = paramGuildId === '@me' && paramChannelId === 'friends';
+
+    useLayoutEffect(() => {
+        closeAnimationRef.current?.cancel();
+        closeAnimationRef.current = null;
+        closePendingRef.current = false;
+        if (!paramChannelId || window.matchMedia('(min-width: 768px)').matches) return;
+        if (document.documentElement.dataset.reducedMotion === 'true' || window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+        const animation = contentShellRef.current?.animate(
+            [{ transform: 'translateX(100%)' }, { transform: 'translateX(0)' }],
+            { duration: 300, easing: 'cubic-bezier(.2, 0, 0, 1)' }
+        );
+        return () => animation?.cancel();
+    }, [paramChannelId]);
+
+    const closeMobileChat = () => {
+        const target = `/${paramGuildId}`;
+        if (isDesktop || document.documentElement.dataset.reducedMotion === 'true' || window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+            navigate(target);
+            return;
+        }
+        if (closePendingRef.current) return;
+        closePendingRef.current = true;
+        setIsClosingMobileChat(true);
+        requestAnimationFrame(() => {
+            if (!closePendingRef.current) return;
+            const animation = contentShellRef.current?.animate(
+                [{ transform: 'translateX(0)' }, { transform: 'translateX(100%)' }],
+                { duration: 260, easing: 'cubic-bezier(.4, 0, 1, 1)', fill: 'forwards' }
+            );
+            if (!animation) {
+                closePendingRef.current = false;
+                setIsClosingMobileChat(false);
+                navigate(target);
+                return;
+            }
+            closeAnimationRef.current = animation;
+            animation.finished.then(() => {
+                if (closeAnimationRef.current !== animation) return;
+                closePendingRef.current = false;
+                navigate(target);
+                setIsClosingMobileChat(false);
+            }).catch(() => {});
+        });
+    };
+
+    useEffect(() => {
+        const media = window.matchMedia('(min-width: 768px)');
+        const update = () => setIsDesktop(media.matches);
+        media.addEventListener('change', update);
+        return () => media.removeEventListener('change', update);
+    }, []);
 
     useEffect(() => setTheme(settings.theme), [setTheme, settings.theme]);
 
@@ -232,9 +294,15 @@ export default function DiscordClient({ socket, user }) {
         if (!socket || !paramGuildId) return;
 
         setChannels([]);
+        setLoadingChannels(true);
+        setChannelsGuildId(null);
+        let cancelled = false;
 
         socket.emit('getChannels', paramGuildId, (data) => {
-            setChannels(data);
+            if (cancelled) return;
+            setChannels(Array.isArray(data) ? data : []);
+            setChannelsGuildId(paramGuildId);
+            setLoadingChannels(false);
         });
 
         if (paramGuildId !== '@me') {
@@ -247,7 +315,28 @@ export default function DiscordClient({ socket, user }) {
             setGuildRoles([]);
         }
 
+        return () => { cancelled = true; };
     }, [socket, paramGuildId]);
+
+    useEffect(() => {
+        if (paramGuildId === '@me' || channelsGuildId !== paramGuildId) return;
+        const readable = channels.flatMap((category) => category.channels || []).filter(isReadableChannel);
+        if (paramChannelId) {
+            const viewed = readable.find((channel) => channel.id === paramChannelId)
+                || readable.flatMap((channel) => channel.threads || []).find((thread) => thread.id === paramChannelId);
+            if (viewed) {
+                try { localStorage.setItem(lastChannelKey(paramGuildId), paramChannelId); } catch { return; }
+            }
+            return;
+        }
+        if (!isDesktop) return;
+        let lastId = null;
+        try { lastId = localStorage.getItem(lastChannelKey(paramGuildId)); } catch { lastId = null; }
+        const lastChannel = readable.find((channel) => channel.id === lastId)
+            || readable.flatMap((channel) => channel.threads || []).find((thread) => thread.id === lastId);
+        const target = lastChannel || readable[0];
+        if (target) navigate(`/${paramGuildId}/${target.id}`, { replace: true });
+    }, [channels, channelsGuildId, isDesktop, navigate, paramChannelId, paramGuildId]);
 
     useEffect(() => {
         if (!socket || !paramGuildId || paramGuildId === '@me') {
@@ -258,34 +347,25 @@ export default function DiscordClient({ socket, user }) {
     }, [socket, paramGuildId]);
 
     useEffect(() => {
-        if (!paramChannelId) setShowMobileChat(false);
-    }, [paramChannelId]);
-
-    useEffect(() => {
         if (uploadDraft) setTimeout(() => scrollToBottom(true), 50);
     }, [uploadDraft, scrollToBottom]);
 
     useEffect(() => {
         if (isFriendsRoute) {
             setMessages([]);
-            setLoadingChannelId(null);
-            setShowMobileChat(true);
             return;
         }
         if (!socket || !paramChannelId) {
             setMessages([]);
-            setLoadingChannelId(null);
             return;
         }
-        setShowMobileChat(true);
-        setLoadingChannelId(paramChannelId);
         setHoveredMessageId(null);
         setContextMenu(null);
         let cancelled = false;
         socket.emit('getMessages', paramChannelId, (msgs) => {
             if (cancelled) return;
             setMessages(msgs);
-            setLoadingChannelId((id) => (id === paramChannelId ? null : id));
+            setLoadedChannelId(paramChannelId);
             setTimeout(() => scrollToBottom(false), 50);
         });
         return () => {
@@ -379,6 +459,7 @@ export default function DiscordClient({ socket, user }) {
     };
 
     const allFlattenedChannels = channels.flatMap((c) => [...(c.channels || []), ...(c.channels?.flatMap((mc) => mc.threads || []) || [])]);
+    const hasReadableChannels = channels.some((category) => (category.channels || []).some(isReadableChannel));
     const currentChannel = allFlattenedChannels.find((c) => c.id === paramChannelId);
     const isForum = currentChannel?.type === 'GUILD_FORUM' || currentChannel?.type === 15;
     const parentForum = channels
@@ -387,7 +468,7 @@ export default function DiscordClient({ socket, user }) {
     const forumContext = isForum ? currentChannel : parentForum;
     const currentGuildData = paramGuildId === '@me' ? { id: '@me', name: "ダイレクトメッセージ", acronym: "DM" } : guilds.find((g) => g.id === paramGuildId);
     const stickerPreviewGuild = stickerPreview?.sticker?.guildId ? guilds.find((g) => g.id === stickerPreview.sticker.guildId) || currentGuildData : currentGuildData;
-    const isChannelLoading = loadingChannelId === paramChannelId;
+    const isChannelLoading = Boolean(paramChannelId && loadedChannelId !== paramChannelId);
     const resolveReplyMessage = (msg) => msg.replyTo?.message || messages.find((candidate) => candidate.id === msg.replyTo?.id);
     const getPickerAnchor = (event) => {
         const rect = event?.currentTarget?.getBoundingClientRect?.();
@@ -398,27 +479,35 @@ export default function DiscordClient({ socket, user }) {
         left: `max(8px, min(${mediaPicker.anchor.right - 400}px, calc(100vw - 408px)))`,
         top: `max(8px, ${mediaPicker.anchor.top - 405}px)`
     } : undefined;
+    const openUserPopout = (event, profileUser) => {
+        event.preventDefault();
+        event.stopPropagation();
+        const avatar = event.currentTarget.closest('.app-message')?.querySelector('.app-message-author-avatar')
+            || event.currentTarget.querySelector?.('.app-user-avatar-wrap')
+            || event.currentTarget;
+        const { left, right, top, bottom } = avatar.getBoundingClientRect();
+        setUserPopout({ anchor: { left, right, top, bottom }, userId: profileUser.id, fallbackUser: profileUser });
+    };
 
     return (
         <div className="app-app" onClick={() => { setContextMenu(null); setUserPopout(null); setMediaPicker(null); }}>
             <WindowHeader guild={currentGuildData} />
-            <div className="app-layout">
-                <div className={`flex shrink-0 ${showMobileChat ? 'hidden md:flex' : 'flex'}`}>
+            <div className="app-layout" data-mobile-closing={isClosingMobileChat}>
+                <div className={`flex shrink-0 ${showMobileChat && !isClosingMobileChat ? 'hidden md:flex' : 'flex'}`}>
                     <ServerList
                         guilds={guilds}
                         currentGuildId={paramGuildId}
                         user={user}
                         onSettings={() => setSettingsOpen(true)}
                         onUserClick={(e) => {
-                            e.preventDefault();
-                            e.stopPropagation();
-                            setUserPopout({ x: e.pageX + 12, y: e.pageY, userId: user.id, fallbackUser: user });
+                            openUserPopout(e, user);
                         }}
                         onSelect={(gid) => navigate(`/${gid}`)}
                     />
                     <ChannelSidebar
                         currentGuild={currentGuildData}
                         channels={channels}
+                        loading={loadingChannels}
                         currentChannelId={paramChannelId}
                         onSelectChannel={(ch) => navigate(`/${paramGuildId}/${ch.id}`)}
                         onSelectHome={() => navigate('/@me')}
@@ -429,9 +518,9 @@ export default function DiscordClient({ socket, user }) {
                     />
                 </div>
 
-                <div className={`app-content-shell ${showMobileChat ? 'flex' : 'hidden md:flex'}`}>
+                <div ref={contentShellRef} className={`app-content-shell ${showMobileChat ? 'flex' : 'hidden md:flex'}`}>
                     {isFriendsRoute ? (
-                        <FriendsView friends={friends} loading={friendsLoading} />
+                        friendsLoading ? <ChatLoadingContent /> : <FriendsView friends={friends} />
                     ) : (
                         <>
                         {forumContext && (
@@ -441,16 +530,16 @@ export default function DiscordClient({ socket, user }) {
                                 selectedThreadId={parentForum ? paramChannelId : null}
                                 split={Boolean(parentForum)}
                                 onSelectThread={(channel) => navigate(`/${paramGuildId}/${channel.id}`)}
-                                onBack={() => navigate(`/${paramGuildId}`)}
+                                onBack={closeMobileChat}
                             />
                         )}
                         {!isForum && <main className="app-chat" data-thread-pane={parentForum ? 'true' : 'false'}>
                             <header className="app-chat-header">
-                                <md-icon-button onClick={() => navigate(`/${paramGuildId}`)} class="m3-icon-button md:hidden" title="戻る">
+                                <md-icon-button onClick={closeMobileChat} class="m3-icon-button md:hidden" title="戻る">
                                     <FaChevronLeft size={18} />
                                 </md-icon-button>
                                 <FaHashtag className="shrink-0" size={18} />
-                                <ChannelHeaderName name={currentChannel?.name || (paramGuildId === '@me' ? "DM" : "チャンネルを選択")} />
+                                <ChannelHeaderName name={currentChannel?.name || (paramGuildId === '@me' ? 'DM' : isDesktop ? currentGuildData?.name || 'サーバー' : 'チャンネルを選択')} />
                                 {parentForum && (
                                     <md-icon-button class="m3-icon-button app-thread-close" title="スレッドを閉じる" onClick={() => navigate(`/${paramGuildId}/${parentForum.id}`)}>
                                         <FaXmark size={17} />
@@ -469,9 +558,7 @@ export default function DiscordClient({ socket, user }) {
                             {paramChannelId ? (
                                 <>
                                     <div ref={scrollRef} onScroll={handleScroll} className="app-messages no-scrollbar" data-loading={isChannelLoading ? 'true' : 'false'} aria-busy={isChannelLoading}>
-                                        <div className="app-channel-loading" data-visible={isChannelLoading ? 'true' : 'false'} role="status" aria-live="polite" aria-hidden={!isChannelLoading}>
-                                            <md-linear-progress indeterminate aria-label="チャンネルを読み込み中" />
-                                        </div>
+                                        {isChannelLoading ? <ChatLoadingContent /> : <>
                                         <div className="flex select-none flex-col mx-4 mt-[18px] mb-2.5 text-[var(--app-on-surface)]">
                                             <h1 className="m-0 text-[32px] leading-[1.15] font-[650]">{currentChannel?.name || '会話'}</h1>
                                             <p className="mt-1.5 mb-0 text-[var(--app-on-surface-variant)] text-base font-medium">これはチャンネル「{currentChannel?.name || '会話'}」の始まりです。</p>
@@ -512,8 +599,8 @@ export default function DiscordClient({ socket, user }) {
                                                     <div className="flex min-w-0">
                                                         <img
                                                             src={getProxyUrl(m.author.avatar)}
-                                                            className="w-9 h-9 shrink-0 mx-1 my-0.5 rounded-full object-cover bg-[var(--app-surface-container-highest)]"
-                                                            onClick={(e) => { e.preventDefault(); e.stopPropagation(); setUserPopout({ x: e.pageX, y: e.pageY, userId: m.author.id, fallbackUser: m.author }); }}
+                                                            className="app-message-author-avatar w-9 h-9 shrink-0 mx-1 my-0.5 rounded-full object-cover bg-[var(--app-surface-container-highest)]"
+                                                            onClick={(e) => openUserPopout(e, m.author)}
                                                             alt=""
                                                         />
                                                         <div className="min-w-0 flex-1 overflow-hidden pr-4">
@@ -521,7 +608,7 @@ export default function DiscordClient({ socket, user }) {
                                                                 <MessageAuthorName 
                                                                     name={m.author.displayName} 
                                                                     color={nameColor} 
-                                                                    onClick={(e) => { e.preventDefault(); e.stopPropagation(); setUserPopout({ x: e.pageX, y: e.pageY, userId: m.author.id, fallbackUser: m.author }); }}
+                                                                    onClick={(e) => openUserPopout(e, m.author)}
                                                                 />
                                                                 <span className="text-sm font-medium text-[var(--app-outline)]">{formatTimestamp(m.timestamp)}</span>
                                                             </div>
@@ -661,6 +748,7 @@ export default function DiscordClient({ socket, user }) {
                                         })}
                                         {uploadDraft && <DraftUploadMessage draft={uploadDraft} user={user} channels={allFlattenedChannels} roles={guildRoles} guildId={paramGuildId} navigate={navigate} guilds={guilds} />}
                                         <div ref={messagesEndRef} className="h-6 shrink-0" />
+                                        </>}
                                     </div>
                                     <ChatInput
                                         channelName={currentChannel?.name}
@@ -710,13 +798,24 @@ export default function DiscordClient({ socket, user }) {
                                     />
                                 </>
                             ) : (
+                                loadingChannels ? (paramGuildId === '@me'
+                                    ? <div className="app-workspace-progress" role="status" aria-label="ホームを読み込み中"><md-linear-progress indeterminate /></div>
+                                    : <ChatLoadingContent />) :
+                                paramGuildId !== '@me' && !isDesktop ? <div className="flex-1" /> :
+                                paramGuildId !== '@me' && isDesktop && hasReadableChannels ? <ChatLoadingContent /> :
                                 <div className="grid flex-1 place-items-center px-6 text-center">
                                     <div className="max-w-sm">
                                         <div className="mx-auto mb-5 grid h-16 w-16 place-items-center rounded-[var(--app-radius-xl)] bg-[var(--app-surface-container-high)] text-[var(--app-outline)]">
                                             <FaHashtag size={28} />
                                         </div>
-                                        <h2 className="mb-2 text-xl font-semibold">チャンネルを選択</h2>
-                                        <p className="text-sm text-[var(--app-on-surface-variant)]">左のサイドバーからテキストチャンネルまたはDMを選択してください。</p>
+                                        {paramGuildId !== '@me' && isDesktop ? (
+                                            <h2 className="mb-2 text-xl font-semibold">表示できるチャンネルがありません</h2>
+                                        ) : (
+                                            <>
+                                                <h2 className="mb-2 text-xl font-semibold">チャンネルを選択</h2>
+                                                <p className="text-sm text-[var(--app-on-surface-variant)]">左のサイドバーからテキストチャンネルまたはDMを選択してください。</p>
+                                            </>
+                                        )}
                                     </div>
                                 </div>
                             )}
@@ -763,7 +862,7 @@ export default function DiscordClient({ socket, user }) {
                 onClose={(key) => setStickerPreview((current) => (!key || current?.key === key ? null : current))}
             />
             {previewData.isOpen && <ImageViewer images={previewData.images} initialIndex={previewData.index} onClose={() => setPreviewData({ ...previewData, isOpen: false })} />}
-            {userPopout && <UserPopout userId={userPopout.userId} guildId={paramGuildId} x={userPopout.x} y={userPopout.y} socket={socket} fallbackUser={userPopout.fallbackUser} onClose={() => setUserPopout(null)} />}
+            {userPopout && <UserPopout userId={userPopout.userId} guildId={paramGuildId} anchor={userPopout.anchor} socket={socket} fallbackUser={userPopout.fallbackUser} onClose={() => setUserPopout(null)} />}
             {mediaPicker && (
                 <div className="app-floating-picker" style={pickerStyle}>
                     <MediaPicker

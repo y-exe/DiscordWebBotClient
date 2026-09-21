@@ -20,7 +20,7 @@ const normalizeProfile = (data, guildId, fallbackUser) => {
 
 const statusLabel = { online: 'オンライン', idle: '退席中', dnd: '取り込み中', offline: 'オフライン', invisible: 'オフライン' };
 
-const UserPopout = ({ userId, guildId, x, y, socket, fallbackUser, onClose }) => {
+const UserPopout = ({ userId, guildId, anchor, socket, fallbackUser, onClose }) => {
   const [result, setResult] = useState({ status: 'loading', profile: null, error: '' });
   const [requestKey, setRequestKey] = useState(0);
 
@@ -62,11 +62,15 @@ const UserPopout = ({ userId, guildId, x, y, socket, fallbackUser, onClose }) =>
 
   const position = useMemo(() => {
     const width = Math.min(360, window.innerWidth - 16);
-    const estimatedHeight = 520;
-    const left = Math.max(8, Math.min(x + width > window.innerWidth ? x - width - 12 : x, window.innerWidth - width - 8));
-    const top = Math.max(8, Math.min(y, window.innerHeight - estimatedHeight - 8));
-    return { left, top, width };
-  }, [x, y]);
+    const gap = 12;
+    const spaceRight = window.innerWidth - anchor.right - gap - 8;
+    const spaceLeft = anchor.left - gap - 8;
+    const side = spaceRight >= width || spaceRight >= spaceLeft ? 'right' : 'left';
+    const preferredLeft = side === 'right' ? anchor.right + gap : anchor.left - width - gap;
+    const left = Math.max(8, Math.min(preferredLeft, window.innerWidth - width - 8));
+    const top = Math.max(8, Math.min(anchor.top, window.innerHeight - Math.min(520, window.innerHeight - 16) - 8));
+    return { left, top, width, side };
+  }, [anchor]);
 
   const profile = result.profile;
   const formatDate = (date) => date ? new Date(date).toLocaleDateString('ja-JP', { year: 'numeric', month: 'long', day: 'numeric' }) : '不明';
@@ -74,7 +78,7 @@ const UserPopout = ({ userId, guildId, x, y, socket, fallbackUser, onClose }) =>
   return (
     <>
       <div className="app-profile-scrim" onClick={onClose} />
-      <section className="app-profile-card" style={position} onClick={(event) => event.stopPropagation()} aria-label="ユーザープロフィール">
+      <section className="app-profile-card" style={{ left: position.left, top: position.top, width: position.width }} data-side={position.side} onClick={(event) => event.stopPropagation()} aria-label="ユーザープロフィール">
         {result.status === 'loading' && (
           <div className="app-profile-loading" role="status">
             <div className="app-profile-skeleton banner" />

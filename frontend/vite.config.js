@@ -11,6 +11,13 @@ export default defineConfig({
     host: true, 
     allowedHosts: [
       'localhost'
-    ]
+    ],
+    proxy: {
+      '/api': 'http://127.0.0.1:8000',
+      '/socket.io': {
+        target: 'http://127.0.0.1:8000',
+        ws: true
+      }
+    }
   }
 })

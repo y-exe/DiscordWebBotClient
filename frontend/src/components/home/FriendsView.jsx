@@ -1,6 +1,7 @@
 import { useMemo, useState } from 'react';
-import { FaCircle, FaEllipsisVertical, FaGamepad, FaMessage, FaUserGroup } from 'react-icons/fa6';
+import { FaCircle, FaEllipsisVertical, FaGamepad, FaMagnifyingGlass, FaMessage, FaUserGroup } from 'react-icons/fa6';
 import { getProxyUrl } from '../../utils/helpers';
+import ChatLoadingContent from '../chat/ChatLoadingContent';
 import { useTwemoji } from '../../hooks/useTwemoji';
 
 const FILTERS = [
@@ -122,10 +123,7 @@ const FriendsView = ({ friends = [], loading = false }) => {
 
         <div className="app-friend-list" aria-busy={loading}>
           {loading && (
-            <div className="min-h-[160px] grid place-items-center gap-2.5 text-[var(--app-outline)] text-sm font-[650]">
-              <span className="app-loading-spinner" aria-hidden="true" />
-              <span>フレンドを読み込み中</span>
-            </div>
+            <ChatLoadingContent />
           )}
           {!loading && filteredFriends.map((friend) => <FriendRow key={friend.id} friend={friend} />)}
           {!loading && filteredFriends.length === 0 && (

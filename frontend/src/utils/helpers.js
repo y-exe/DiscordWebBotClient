@@ -1,4 +1,4 @@
-export const API_URL = (import.meta.env.VITE_API_URL || "https://dapi.yexe.xyz").replace(/\/$/, '');
+export const API_URL = (import.meta.env.VITE_API_URL ?? (import.meta.env.DEV ? '' : 'https://dapi.yexe.xyz')).replace(/\/$/, '');
 
 const PROXY_IMAGE_HOSTS = new Set([
   'cdn.discordapp.com',

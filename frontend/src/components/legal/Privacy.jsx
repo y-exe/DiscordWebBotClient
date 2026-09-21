@@ -1,14 +1,17 @@
 import { useEffect } from 'react';
-import { motion as Motion } from 'framer-motion';
+import { motion as Motion, useReducedMotion } from 'framer-motion';
 import Header from '../auth/Header';
 import Footer from '../auth/Footer';
 import MouseEffectCard from '../ui/MouseEffectCard';
 import Head from '../seo/Head';
 
-const containerVariants = { hidden: { opacity: 0 }, visible: { opacity: 1, transition: { staggerChildren: 0.1, delayChildren: 0.2 } } };
-const itemVariants = { hidden: { opacity: 0, y: 20 }, visible: { opacity: 1, y: 0, transition: { type: "spring", stiffness: 50, damping: 20 } } };
+const containerVariants = { hidden: {}, visible: { transition: { staggerChildren: 0.1, delayChildren: 0.1 } } };
+const itemVariants = { hidden: { opacity: 0, y: 28 }, visible: { opacity: 1, y: 0, transition: { duration: 0.65, ease: [0.16, 1, 0.3, 1] } } };
+const reducedItemVariants = { hidden: { opacity: 0 }, visible: { opacity: 1, transition: { duration: 0.15 } } };
 
 export default function Privacy() {
+  const reduceMotion = useReducedMotion();
+  const entranceVariants = reduceMotion ? reducedItemVariants : itemVariants;
   useEffect(() => {
     window.scrollTo(0, 0);
   }, []);
@@ -28,25 +31,25 @@ export default function Privacy() {
         </div>
         
         <main className="container mx-auto max-w-4xl py-32 px-6 flex-grow relative z-10">
-          <Motion.div initial="hidden" animate="visible" variants={containerVariants}>
-            <Motion.h1 variants={itemVariants} className="text-4xl md:text-5xl font-extrabold mb-12 tracking-tight text-gray-900 dark:text-white">プライバシーポリシー</Motion.h1>
+          <Motion.div initial="hidden" animate="visible" variants={reduceMotion ? undefined : containerVariants}>
+            <Motion.h1 variants={entranceVariants} className="text-4xl md:text-5xl font-extrabold mb-12 tracking-tight text-gray-900 dark:text-white">プライバシーポリシー</Motion.h1>
             
             <div className="space-y-12 text-gray-600 dark:text-gray-300 leading-relaxed font-google">
-              <Motion.section variants={itemVariants}>
+              <Motion.section variants={entranceVariants}>
                 <h2 className="text-xl font-bold text-gray-900 dark:text-white mb-4 flex items-center gap-2">
                   <span className="w-1.5 h-6 bg-indigo-500 rounded-full"></span>1. トークンの取り扱い
                 </h2>
                 <p>入力されたDiscordトークンは、サーバーを介してDiscord公式APIとのリアルタイム通信のみに使用されます。当サーバー側のDBやファイルにトークンが永続的に保存されることはなく、接続終了時にサーバーのメモリから破棄されます。</p>
               </Motion.section>
 
-              <Motion.section variants={itemVariants}>
+              <Motion.section variants={entranceVariants}>
                 <h2 className="text-xl font-bold text-gray-900 dark:text-white mb-4 flex items-center gap-2">
                   <span className="w-1.5 h-6 bg-indigo-500 rounded-full"></span>2. ログイン履歴（Cookie）
                 </h2>
                 <p>利便性の向上のため、ログインに成功したアカウントのトークンをJavaScriptから読み取れないHttpOnly Cookieとしてブラウザに保存します。ユーザー名、ID、アバターなどの表示情報はlocalStorageに保存します。トークンはバックエンドのDBやファイルには保存されません。</p>
               </Motion.section>
 
-              <Motion.section variants={itemVariants}>
+              <Motion.section variants={entranceVariants}>
                 <h2 className="text-xl font-bold text-gray-900 dark:text-white mb-4 flex items-center gap-2">
                   <span className="w-1.5 h-6 bg-indigo-500 rounded-full"></span>3. ログの収集
                 </h2>

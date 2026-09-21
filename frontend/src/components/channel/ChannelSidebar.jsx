@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { FaChevronRight, FaHashtag, FaHouse, FaUserGroup, FaUserPlus, FaVolumeHigh } from 'react-icons/fa6';
 import { getProxyUrl } from '../../utils/helpers';
 import { useTwemoji } from '../../hooks/useTwemoji';
+import SidebarLoadingContent from './SidebarLoadingContent';
 
 const AnnouncementIcon = ({ size = 18 }) => (
   <svg aria-hidden="true" role="img" xmlns="http://www.w3.org/2000/svg" width={size} height={size} fill="none" viewBox="0 0 24 24">
@@ -64,6 +65,7 @@ const ChannelSidebar = ({
   onSelectChannel,
   onSelectHome,
   onSelectFriends,
+  loading = false,
   joinedVoiceChannelId,
   onLeaveVoice,
 }) => {
@@ -113,7 +115,8 @@ const ChannelSidebar = ({
           </div>
         )}
 
-        {channels.map((cat) => {
+        {loading && <SidebarLoadingContent isDMList={isDMList} />}
+        {!loading && channels.map((cat) => {
           const catId = cat.id || 'uncategorized';
           const isCollapsed = collapsedCategories.has(catId);
           if (!cat.channels || cat.channels.length === 0) return null;
