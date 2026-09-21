@@ -1,9 +1,11 @@
 import { useCallback, useEffect, useState } from 'react';
+import { useTheme } from 'next-themes';
 
 const STORAGE_KEY = 'discord-webclient-settings-v1';
+const HOME_THEME_KEY = 'discord-webclient-home-theme';
 
 export const DEFAULT_APP_SETTINGS = Object.freeze({
-  theme: 'system',
+  theme: 'dark',
   accent: 'violet',
   blur: true,
   reducedMotion: false,
@@ -16,6 +18,23 @@ export const DEFAULT_APP_SETTINGS = Object.freeze({
   compactMode: false,
   developerMode: false,
 });
+
+export const getHomeTheme = () => {
+  if (typeof window === 'undefined') return 'dark';
+  try {
+    return localStorage.getItem(HOME_THEME_KEY) || 'dark';
+  } catch {
+    return 'dark';
+  }
+};
+
+export const saveHomeTheme = (theme) => {
+  if (typeof window === 'undefined') return;
+  if (!validValues.theme.includes(theme)) return;
+  try {
+    localStorage.setItem(HOME_THEME_KEY, theme);
+  } catch {}
+};
 
 const validValues = {
   theme: ['light', 'dark', 'system'],
@@ -72,11 +91,15 @@ export const applyAppSettings = (settings) => {
 
 export const useAppSettings = () => {
   const [settings, setSettings] = useState(loadAppSettings);
+  const { setTheme } = useTheme();
 
   useEffect(() => {
     applyAppSettings(settings);
     localStorage.setItem(STORAGE_KEY, JSON.stringify(settings));
-  }, [settings]);
+    if (settings?.theme) {
+      setTheme(settings.theme);
+    }
+  }, [settings, setTheme]);
 
   const updateSettings = useCallback((patch) => {
     setSettings((current) => cleanAppSettings({

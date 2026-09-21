@@ -1,4 +1,4 @@
-import { useLayoutEffect, useRef } from 'react';
+import { useCallback, useLayoutEffect, useRef } from 'react';
 import twemoji from 'twemoji';
 
 const TWEMOJI_OPTIONS = {
@@ -9,12 +9,15 @@ const TWEMOJI_OPTIONS = {
 
 export const useTwemoji = () => {
   const ref = useRef(null);
+  const lastContent = useRef(null);
 
-  const apply = () => {
-    if (ref.current) {
-      twemoji.parse(ref.current, TWEMOJI_OPTIONS);
-    }
-  };
+  const apply = useCallback(() => {
+    if (!ref.current) return;
+    const current = ref.current.textContent || '';
+    if (lastContent.current === current) return;
+    lastContent.current = current;
+    twemoji.parse(ref.current, TWEMOJI_OPTIONS);
+  }, []);
 
   useLayoutEffect(() => {
     apply();

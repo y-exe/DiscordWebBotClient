@@ -1,5 +1,5 @@
 export function initAnalytics() {
-  const gaId = import.meta.env.GA_ID || import.meta.env.VITE_GA_ID;
+  const gaId = process.env.GA_ID || process.env.NEXT_PUBLIC_GA_ID || 'G-Z3DMZV1XXD';
   if (!gaId) return;
 
   const script = document.createElement('script');
@@ -18,7 +18,7 @@ export function initAnalytics() {
 }
 
 export function trackPageView(path) {
-  const gaId = import.meta.env.GA_ID || import.meta.env.VITE_GA_ID;
+  const gaId = process.env.GA_ID || process.env.NEXT_PUBLIC_GA_ID || 'G-Z3DMZV1XXD';
   if (!gaId || typeof window.gtag !== 'function') return;
 
   window.gtag('config', gaId, {

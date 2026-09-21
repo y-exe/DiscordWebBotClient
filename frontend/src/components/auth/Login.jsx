@@ -1,12 +1,12 @@
+'use client';
 import { useEffect, useState } from 'react';
 import { motion as Motion, AnimatePresence, useReducedMotion } from 'framer-motion';
 import MouseEffectCard from '../ui/MouseEffectCard';
 import { InteractiveHoverButton } from '../ui/InteractiveHoverButton';
-import { FaUser, FaRobot, FaDiscord, FaTrash, FaQuestionCircle, FaTimes, FaArrowRight, FaHistory } from 'react-icons/fa';
+import { FaUser, FaRobot, FaDiscord, FaTrash, FaQuestionCircle, FaTimes, FaHistory } from 'react-icons/fa';
 import Header from './Header';
 import Footer from './Footer';
 import { NativeDelete } from '../ui/NativeDelete';
-import Head from '../seo/Head';
 import {
   chooseAccountSlot,
   deleteAllStoredAccounts,
@@ -22,8 +22,8 @@ const containerVariants = {
   visible: { transition: { staggerChildren: 0.085, delayChildren: 0.12 } }
 };
 const itemVariants = {
-  hidden: { opacity: 0, y: 30, scale: 0.985 },
-  visible: { opacity: 1, y: 0, scale: 1, transition: { duration: 0.65, ease: [0.16, 1, 0.3, 1] } }
+  hidden: { opacity: 0, y: 20, scale: 0.985 },
+  visible: { opacity: 1, y: 0, scale: 1, transition: { duration: 0.5, ease: [0.16, 1, 0.3, 1] } }
 };
 const reducedItemVariants = {
   hidden: { opacity: 0 },
@@ -35,19 +35,31 @@ export default function Login() {
   const entranceVariants = reduceMotion ? reducedItemVariants : itemVariants;
   const [userToken, setUserToken] = useState("");
   const [botToken, setBotToken] = useState("");
-  const [history, setHistory] = useState(loadAccountHistory);
+  const [history, setHistory] = useState([]);
   const [showTokenHelp, setShowTokenHelp] = useState(false);
   const [loginError, setLoginError] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
+    const initial = loadAccountHistory();
+    console.log('[Login] Loaded initial history count:', initial.length, initial);
+    if (initial.length > 0) {
+      setHistory(initial);
+    }
+
     migrateLegacyAccounts()
       .then((migratedHistory) => {
-        if (!cancelled) setHistory(migratedHistory);
+        console.log('[Login] Migrated history count:', migratedHistory?.length, migratedHistory);
+        if (!cancelled && Array.isArray(migratedHistory) && migratedHistory.length > 0) {
+          setHistory(migratedHistory);
+        }
       })
       .catch((error) => {
         console.error('Could not migrate the legacy login history:', error);
+        if (!cancelled) {
+          setHistory(loadAccountHistory());
+        }
       });
     return () => { cancelled = true; };
   }, []);
@@ -98,17 +110,12 @@ export default function Login() {
 
   return (
     <div className="home-screen min-h-screen w-full bg-white dark:bg-black text-gray-900 dark:text-gray-100 flex flex-col font-google light-scrollbar transition-colors duration-300 relative">
-      <Head 
-        title="ログイン" 
-        description="DiscordWebTokenClient ブラウザ上で動作する高速・軽量なDiscordクライアント トークンを使用してログインし、Bot,Userともに操作が可能です。"
-        path="/login"
-      />
       <Header />
       <div className="flex-grow flex flex-col relative w-full overflow-hidden">
         <MouseEffectCard className="absolute inset-0 z-0 bg-transparent border-none rounded-none"><div className="w-full h-full"></div></MouseEffectCard>
-        <main className="w-full max-w-5xl mx-auto flex flex-col items-center justify-center py-24 px-4 relative z-10">
+        <main className="w-full max-w-5xl mx-auto flex flex-col items-center justify-center py-16 md:py-20 px-4 relative z-10">
             <Motion.div className="w-full flex flex-col items-center" variants={reduceMotion ? undefined : containerVariants} initial="hidden" animate="visible">
-                <div className="text-center mb-12">
+                <div className="text-center mb-8 md:mb-10">
                     <Motion.div variants={entranceVariants} className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full border border-gray-200 dark:border-zinc-800 bg-white/80 dark:bg-zinc-900/80 backdrop-blur-sm shadow-sm mb-6">
                         <FaDiscord className="text-[#5865F2]" /><span className="text-xs font-bold text-gray-600 dark:text-gray-300 tracking-wide font-ggsans">DISCORD</span>
                     </Motion.div>
@@ -120,12 +127,17 @@ export default function Login() {
                     </Motion.p>
                 </div>
 
-                {loginError && <p role="alert" className="mb-6 text-sm font-bold text-red-500">{loginError}</p>}
+                {loginError ? <p role="alert" className="mb-6 text-sm font-bold text-red-500">{loginError}</p> : null}
 
                 {history.length > 0 && (
-                    <Motion.div variants={entranceVariants} className="w-full max-w-4xl mb-10 bg-white/90 dark:bg-zinc-900/90 backdrop-blur-sm border border-gray-200 dark:border-zinc-800 rounded-2xl shadow-lg p-6">
+                    <Motion.div 
+                        initial={reduceMotion ? { opacity: 0 } : { opacity: 0, y: 20, scale: 0.985 }}
+                        animate={reduceMotion ? { opacity: 1 } : { opacity: 1, y: 0, scale: 1 }}
+                        transition={{ duration: 0.4, ease: [0.16, 1, 0.3, 1] }}
+                        className="w-full max-w-4xl mb-8 md:mb-10 bg-white/90 dark:bg-zinc-900/90 backdrop-blur-sm border border-gray-200 dark:border-zinc-800 rounded-2xl shadow-lg p-6"
+                    >
                         <div className="flex items-center justify-between gap-3 mb-4">
-                            <div className="flex items-center gap-2"><FaHistory className="text-gray-400" /><h3 className="text-xs font-bold text-gray-500 dark:text-gray-400 uppercase tracking-widest font-google">Login History</h3></div>
+                            <div className="flex items-center gap-2"><FaHistory className="text-gray-400" /><h3 className="text-xs font-bold text-gray-500 dark:text-gray-400 tracking-wider font-google">ログイン履歴</h3></div>
                             <NativeDelete buttonText="Clear All" confirmText="Confirm Clear" size="sm" onDelete={deleteAllHistory} />
                         </div>
                         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
@@ -140,28 +152,33 @@ export default function Login() {
                     </Motion.div>
                 )}
 
-                <Motion.div variants={entranceVariants} className="w-full max-w-4xl shadow-2xl rounded-2xl overflow-hidden border border-gray-200 dark:border-zinc-800 bg-black text-white flex flex-col md:flex-row min-h-[380px]">
-                    <div className="flex-1 p-8 md:p-10 border-b md:border-b-0 md:border-r border-zinc-800 flex flex-col items-center justify-center relative">
+                <Motion.div 
+                    initial={reduceMotion ? { opacity: 0 } : { opacity: 0, y: 20, scale: 0.985 }}
+                    animate={reduceMotion ? { opacity: 1 } : { opacity: 1, y: 0, scale: 1 }}
+                    transition={{ duration: 0.5, ease: [0.16, 1, 0.3, 1] }}
+                    className="w-full max-w-4xl shadow-2xl rounded-2xl overflow-hidden border border-gray-200 dark:border-zinc-800 bg-white/95 dark:bg-zinc-950/95 backdrop-blur-sm text-gray-900 dark:text-white flex flex-col md:flex-row min-h-[380px]"
+                >
+                    <div className="flex-1 p-8 md:p-10 border-b md:border-b-0 md:border-r border-gray-200 dark:border-zinc-800 flex flex-col items-center justify-center relative">
                         <div className="w-full max-w-xs text-center relative z-10">
-                            <h3 className="text-xl font-bold mb-2 font-google">User Token</h3>
-                            <p className="text-xs text-gray-400 mb-6 font-mono tracking-tight">個人アカウント用ログイン (Selfbotv13)</p>
+                            <h3 className="text-xl font-bold mb-2 font-google text-gray-900 dark:text-white">User Token</h3>
+                            <p className="text-xs text-gray-500 dark:text-gray-400 mb-6 font-mono tracking-tight">個人アカウント用ログイン (Selfbotv13)</p>
                             <div className="space-y-4 w-full text-center">
-                                <input type="password" value={userToken} onChange={(e) => setUserToken(e.target.value)} placeholder="User Token を入力..." className="w-full bg-zinc-900 border border-zinc-700 text-white text-sm rounded-lg focus:ring-2 focus:ring-[#5865F2] focus:border-transparent block p-3 outline-none transition-all placeholder-zinc-500 text-center font-mono shadow-sm"/>
+                                <input type="password" value={userToken} onChange={(e) => setUserToken(e.target.value)} placeholder="User Token を入力..." className="w-full bg-gray-50 dark:bg-zinc-900 border border-gray-300 dark:border-zinc-700 text-gray-900 dark:text-white text-sm rounded-lg focus:ring-2 focus:ring-[#5865F2] focus:border-transparent block p-3 outline-none transition-all placeholder-gray-400 dark:placeholder-zinc-500 text-center font-mono shadow-sm"/>
                                 <div className="flex justify-center">
                                     <InteractiveHoverButton text="Login" onClick={() => handleLogin(userToken, false)} />
                                 </div>
-                                <button onClick={() => setShowTokenHelp(true)} className="flex items-center justify-center gap-1.5 text-xs text-gray-500 hover:text-white transition-colors mx-auto pt-2 font-google">
+                                <button onClick={() => setShowTokenHelp(true)} className="flex items-center justify-center gap-1.5 text-xs text-gray-500 hover:text-gray-900 dark:hover:text-white transition-colors mx-auto pt-2 font-google">
                                     <FaQuestionCircle />Discordトークンの入手方法は？
                                 </button>
                             </div>
                         </div>
                     </div>
-                    <div className="flex-1 p-8 md:p-10 flex flex-col items-center justify-center bg-white/5 relative">
+                    <div className="flex-1 p-8 md:p-10 flex flex-col items-center justify-center bg-gray-50/50 dark:bg-white/[0.02] relative">
                         <div className="w-full max-w-xs text-center relative z-10">
-                            <h3 className="text-xl font-bold mb-2 font-google">Bot Token</h3>
-                            <p className="text-xs text-gray-400 mb-6 font-mono tracking-tight">公式BOTログイン (Discord.js)</p>
+                            <h3 className="text-xl font-bold mb-2 font-google text-gray-900 dark:text-white">Bot Token</h3>
+                            <p className="text-xs text-gray-500 dark:text-gray-400 mb-6 font-mono tracking-tight">公式BOTログイン (Discord.js)</p>
                             <div className="space-y-4 w-full text-center">
-                                <input type="password" value={botToken} onChange={(e) => setBotToken(e.target.value)} placeholder="Bot Token を入力..." className="w-full bg-zinc-900 border border-zinc-700 text-white text-sm rounded-lg focus:ring-2 focus:ring-[#5865F2] focus:border-transparent block p-3 outline-none transition-all placeholder-zinc-500 text-center font-mono shadow-sm"/>
+                                <input type="password" value={botToken} onChange={(e) => setBotToken(e.target.value)} placeholder="Bot Token を入力..." className="w-full bg-gray-50 dark:bg-zinc-900 border border-gray-300 dark:border-zinc-700 text-gray-900 dark:text-white text-sm rounded-lg focus:ring-2 focus:ring-[#5865F2] focus:border-transparent block p-3 outline-none transition-all placeholder-gray-400 dark:placeholder-zinc-500 text-center font-mono shadow-sm"/>
                                 <div className="flex justify-center">
                                     <InteractiveHoverButton text="Login" onClick={() => handleLogin(botToken, true)} />
                                 </div>

@@ -1,15 +1,10 @@
+'use client';
 import React, { useState, useEffect, Suspense, lazy } from 'react';
-import { Routes, Route, useNavigate, Navigate, useLocation } from 'react-router-dom';
+import { useNavigate, useLocation } from './utils/navigation';
 import { io } from 'socket.io-client';
-import { ThemeProvider } from 'next-themes'; 
-import { API_URL } from './utils/helpers';
-import { trackPageView } from './analytics.js';
-import Login from './components/auth/Login';
-import Terms from './components/legal/Terms';
-import Privacy from './components/legal/Privacy';
+import { SOCKET_URL } from './utils/helpers';
 import ChatLoadingContent from './components/chat/ChatLoadingContent';
 import SidebarLoadingContent from './components/channel/SidebarLoadingContent';
-import { applyAppSettings, loadAppSettings, saveAppTheme } from './hooks/useAppSettings';
 import {
   clearPendingLogin,
   commitPendingLogin,
@@ -51,6 +46,7 @@ const RequireAuth = ({ children }) => {
     const navigate = useNavigate();
     const [user, setUser] = useState(null);
     const [isReady, setIsReady] = useState(false);
+    const loginAttemptedRef = React.useRef(false);
 
     useEffect(() => {
         const sessionStr = sessionStorage.getItem('current-session');
@@ -74,14 +70,22 @@ const RequireAuth = ({ children }) => {
         }
 
         if (!globalSocket) {
-            globalSocket = io(API_URL, { 
+            globalSocket = io(SOCKET_URL, {
                 transports: ['websocket'],
                 withCredentials: true,
                 reconnection: true 
             });
 
+            const tryEmitLogin = () => {
+                if (loginAttemptedRef.current) return;
+                loginAttemptedRef.current = true;
+                const currentSessionStr = sessionStorage.getItem('current-session');
+                const activeSession = currentSessionStr ? JSON.parse(currentSessionStr) : session;
+                globalSocket.emit('login', { slot: activeSession.slot, pending: activeSession.pending === true });
+            };
+
             globalSocket.on('connect', () => { 
-                globalSocket.emit('login', { slot: session.slot, pending: session.pending === true });
+                tryEmitLogin();
             });
 
             globalSocket.on('login-success', async ({ user: userData, isBot }) => {
@@ -89,15 +93,26 @@ const RequireAuth = ({ children }) => {
                     const currentHistory = loadAccountHistory();
                     const existing = currentHistory.find((item) => item.id === userData.id && item.isBot === isBot);
                     const slot = existing?.slot ?? session.slot;
-                    if (session.pending === true) await commitPendingLogin(slot);
-                    else await refreshStoredAccount(slot);
+                    if (session.pending === true) {
+                        try {
+                            await commitPendingLogin(slot);
+                        } catch (commitErr) {
+                            console.warn('[Auth] commitPendingLogin warning:', commitErr);
+                        }
+                    } else {
+                        try {
+                            await refreshStoredAccount(slot);
+                        } catch (refreshErr) {
+                            console.warn('[Auth] refreshStoredAccount warning:', refreshErr);
+                        }
+                    }
                     const newHistory = [
                         { slot, isBot, ...userData },
                         ...currentHistory.filter((item) => item.slot !== slot && item.id !== userData.id),
                     ].slice(0, 5);
                     saveAccountHistory(newHistory);
-                    session = { slot, isBot, pending: false };
-                    sessionStorage.setItem('current-session', JSON.stringify(session));
+                    const updatedSession = { slot, isBot, pending: false };
+                    sessionStorage.setItem('current-session', JSON.stringify(updatedSession));
                     setUser(userData);
                     setIsReady(true);
                 } catch (error) {
@@ -109,21 +124,25 @@ const RequireAuth = ({ children }) => {
                 }
             });
 
-            globalSocket.on('login-error', () => {
+            globalSocket.on('login-error', (err) => {
+                console.warn('[Auth] login-error received:', err);
+                if (isReady) return;
                 if (session.pending === true) clearPendingLogin().catch(() => {});
                 sessionStorage.removeItem('current-session');
-                globalSocket.disconnect();
+                globalSocket?.disconnect();
                 globalSocket = null;
+                loginAttemptedRef.current = false;
                 navigate('/login', { replace: true });
             });
         } else {
-            if (globalSocket.connected) {
+            if (globalSocket.connected && !loginAttemptedRef.current && !isReady) {
+                loginAttemptedRef.current = true;
                 globalSocket.emit('login', { slot: session.slot, pending: session.pending === true });
             }
         }
 
         window.socket = globalSocket;
-    }, [navigate]);
+    }, [navigate, isReady]);
 
     if (!isReady || !globalSocket) {
         return <DiscordLoadingShell />;
@@ -139,39 +158,5 @@ const DiscordRoute = () => (
 );
 
 export default function App() {
-  const location = useLocation();
-  const [initialTheme] = useState(() => {
-    const settings = loadAppSettings();
-    applyAppSettings(settings);
-    let theme = settings.theme;
-    try {
-      if (theme === 'system') {
-        const previousTheme = localStorage.getItem('discord-webclient-theme') ?? localStorage.getItem('theme');
-        if (['light', 'dark', 'system'].includes(previousTheme)) theme = previousTheme;
-      }
-      saveAppTheme(theme);
-      localStorage.setItem('theme', theme);
-      localStorage.removeItem('discord-webclient-theme');
-    } catch { return theme; }
-    return theme;
-  });
-
-  useEffect(() => {
-    trackPageView(location.pathname + location.search);
-  }, [location]);
-
-  return (
-    <ThemeProvider attribute="class" defaultTheme={initialTheme} enableSystem>
-      <Routes>
-          <Route path="/login" element={<Login />} />
-          <Route path="/terms" element={<Terms />} />
-          <Route path="/privacy" element={<Privacy />} />
-          
-          <Route path="/:guildId/:channelId" element={<DiscordRoute />} />
-          <Route path="/:guildId" element={<DiscordRoute />} />
-          
-          <Route path="/" element={ (location.pathname === '/' && location.hash === '') ? <Navigate to="/login" replace /> : <Navigate to="/@me" replace /> } />
-      </Routes>
-    </ThemeProvider>
-  );
+  return <DiscordRoute />;
 }

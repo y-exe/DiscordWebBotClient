@@ -1,4 +1,5 @@
-export const API_URL = (import.meta.env.VITE_API_URL ?? (import.meta.env.DEV ? '' : 'https://dapi.yexe.xyz')).replace(/\/$/, '');
+export const API_URL = (process.env.NEXT_PUBLIC_API_URL ?? (process.env.NODE_ENV === 'development' ? '' : 'https://dapi.yexe.xyz')).replace(/\/$/, '');
+export const SOCKET_URL = process.env.NEXT_PUBLIC_SOCKET_URL ?? (process.env.NODE_ENV === 'development' ? 'http://localhost:8000' : API_URL);
 
 const PROXY_IMAGE_HOSTS = new Set([
   'cdn.discordapp.com',

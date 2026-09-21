@@ -3,10 +3,11 @@
   "name": "discord-webclient",
   "compatibility_date": "2026-08-08",
   "workers_dev": false,
+  "main": ".open-next/worker.js",
+  "compatibility_flags": ["nodejs_compat"],
   "assets": {
-    "directory": "./dist",
-    "html_handling": "drop-trailing-slash",
-    "not_found_handling": "single-page-application"
+    "directory": ".open-next/assets",
+    "binding": "ASSETS"
   },
   "routes": [
     {

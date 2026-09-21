@@ -3,7 +3,7 @@
   Discord Web Token Client
   
   [![discord.js-selfbot-v13 3.7.1](https://img.shields.io/badge/discord.js--selfbot--v13-3.7.1-5865F2?style=flat-square&logo=discord&logoColor=white)](https://github.com/aiko-chan-ai/discord.js-selfbot-v13)
-  [![React + Vite](https://img.shields.io/badge/React%2BVite-19.2.3%20/%207.3.1-61DAFB?style=flat-square&logo=react&logoColor=white)](https://ja.react.dev/)
+  [![Next.js](https://img.shields.io/badge/Next.js-16-black?style=flat-square&logo=next.js)](https://nextjs.org/)
   [![express 5.2.1](https://img.shields.io/badge/express-5.2.1-339933?style=flat-square&logo=node.js&logoColor=white)](https://expressjs.com/ja/)
   [![Licence AGPL-3.0](https://img.shields.io/badge/Licence-AGPL--3.0-green.svg?style=flat-square)](LICENSE)
 </h1>
@@ -48,7 +48,7 @@ Bot トークンおよびユーザー個人トークンにも一応対応して�
 ## ディレクトリ構造
 
 ```
-/frontend  React(Vite) + Tailwind CSS (ほぼMaterial3Expressive)
+/frontend  Next.js + Tailwind CSS (ほぼMaterial3Expressive)
 /backend   Node.js + Express + Socket.io
 ```
 

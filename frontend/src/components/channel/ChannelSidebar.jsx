@@ -69,7 +69,7 @@ const ChannelSidebar = ({
   joinedVoiceChannelId,
   onLeaveVoice,
 }) => {
-  const isDMList = currentGuild?.id === '@me';
+  const isDMList = decodeURIComponent(currentGuild?.id || '') === '@me';
   const bannerUrl = currentGuild?.banner ? getProxyUrl(currentGuild.banner) : null;
   const [collapsedCategories, setCollapsedCategories] = useState(new Set());
   const toggleCategory = (catId) => {

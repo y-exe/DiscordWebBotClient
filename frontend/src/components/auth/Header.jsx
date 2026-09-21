@@ -1,7 +1,7 @@
 import { useState } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
+import { motion as Motion, AnimatePresence } from 'framer-motion';
 import { FaGithub, FaChevronDown } from 'react-icons/fa6';
-import { Link } from 'react-router-dom';
+import { AppLink as Link } from '../../utils/navigation';
 import { ToggleTheme } from '../ui/ThemeToggle';
 
 const menuItems = [
@@ -47,7 +47,7 @@ export default function Header() {
                                 </button>
                                 <AnimatePresence>
                                     {hoveredIndex === i && (
-                                        <motion.div initial={{ opacity: 0, y: 10, scale: 0.95 }} animate={{ opacity: 1, y: 0, scale: 1 }} exit={{ opacity: 0, y: 10, scale: 0.95 }} transition={{ duration: 0.2 }} className="absolute top-full left-0 w-64 pt-2">
+                                        <Motion.div initial={{ opacity: 0, y: 10, scale: 0.95 }} animate={{ opacity: 1, y: 0, scale: 1 }} exit={{ opacity: 0, y: 10, scale: 0.95 }} transition={{ duration: 0.2 }} className="absolute top-full left-0 w-64 pt-2">
                                             <div className="bg-white dark:bg-zinc-900 border border-gray-200 dark:border-zinc-800 rounded-xl shadow-xl p-2 overflow-hidden">
                                                 {item.links.map((link, j) => (
                                                     link.isExternal ? (
@@ -63,7 +63,7 @@ export default function Header() {
                                                     )
                                                 ))}
                                             </div>
-                                        </motion.div>
+                                        </Motion.div>
                                     )}
                                 </AnimatePresence>
                             </div>

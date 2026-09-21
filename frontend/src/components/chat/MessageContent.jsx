@@ -111,7 +111,7 @@ const parseCustomEmojis = (text) => {
     const id = match[3];
     const url = `https://cdn.discordapp.com/emojis/${id}.${isAnimated ? 'gif' : 'png'}?size=48`;
     parts.push(
-      <img key={`e-${id}-${match.index}`} src={getProxyUrl(url)} alt={`:${name}:`} className="custom-emoji inline-block h-[1.2em] align-[-0.2em]" />
+      <img key={`e-${id}-${match.index}`} src={getProxyUrl(url)} loading="lazy" decoding="async" alt={`:${name}:`} className="custom-emoji inline-block h-[1.2em] align-[-0.2em]" />
     );
     lastIndex = re.lastIndex;
   }

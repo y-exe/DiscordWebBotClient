@@ -36,7 +36,7 @@ const parseCustomEmojis = (text) => {
     const id = match[3];
     const url = `https://cdn.discordapp.com/emojis/${id}.${isAnimated ? 'gif' : 'png'}?size=48`;
     parts.push(
-      <img key={`e-${id}-${match.index}`} src={getProxyUrl(url)} alt={`:${name}:`} className="custom-emoji inline-block h-[1.2em] align-[-0.2em]" />
+      <img key={`e-${id}-${match.index}`} src={getProxyUrl(url)} loading="lazy" decoding="async" alt={`:${name}:`} className="custom-emoji inline-block h-[1.2em] align-[-0.2em]" />
     );
     lastIndex = re.lastIndex;
   }
@@ -50,7 +50,7 @@ const MentionPill = ({ children, className = '' }) => (
 
 const SafeImage = ({ src, ...props }) => {
   const safeSrc = safeMediaUrl(src);
-  return safeSrc ? <img src={getProxyUrl(safeSrc)} {...props} /> : null;
+  return safeSrc ? <img src={getProxyUrl(safeSrc)} loading="lazy" decoding="async" {...props} /> : null;
 };
 
 const MentionInline = ({ 'data-type': type, 'data-guild': guildId, 'data-channel': channelId, 'data-role': roleId, 'data-user': userId, 'data-text': text, children, channels, guildRoles, navigate }) => {
@@ -107,7 +107,7 @@ const MentionInline = ({ 'data-type': type, 'data-guild': guildId, 'data-channel
   }
 };
 
-const MessageEmbed = ({ embed, onImageClick, channels, guildRoles, guildId, navigate }) => {
+const MessageEmbed = ({ embed, onImageClick, channels, guildRoles, navigate }) => {
   if (!embed) return null;
 
   const embedColor = typeof embed.color === 'number'

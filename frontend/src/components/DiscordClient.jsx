@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
-import { useNavigate, useParams } from 'react-router-dom';
+import { useNavigate, useParams } from '../utils/navigation';
 import { useTheme } from 'next-themes';
 import { FaBell, FaChevronLeft, FaHashtag, FaInbox, FaMagnifyingGlass, FaXmark } from 'react-icons/fa6';
 
@@ -191,6 +191,7 @@ export default function DiscordClient({ socket, user }) {
     const [isClosingMobileChat, setIsClosingMobileChat] = useState(false);
 
     const scrollRef = useRef(null);
+    const recentMessages = useRef(new Map());
     const contentShellRef = useRef(null);
     const closeAnimationRef = useRef(null);
     const closePendingRef = useRef(false);
@@ -359,12 +360,22 @@ export default function DiscordClient({ socket, user }) {
             setMessages([]);
             return;
         }
+        const cached = recentMessages.current.get(paramChannelId);
+        if (cached) {
+            setMessages(cached);
+            setLoadedChannelId(paramChannelId);
+            requestAnimationFrame(() => scrollToBottom(false));
+        }
         setHoveredMessageId(null);
         setContextMenu(null);
         let cancelled = false;
         socket.emit('getMessages', paramChannelId, (msgs) => {
             if (cancelled) return;
-            setMessages(msgs);
+            const nextMessages = Array.isArray(msgs) ? msgs : [];
+            recentMessages.current.delete(paramChannelId);
+            recentMessages.current.set(paramChannelId, nextMessages);
+            if (recentMessages.current.size > 12) recentMessages.current.delete(recentMessages.current.keys().next().value);
+            setMessages(nextMessages);
             setLoadedChannelId(paramChannelId);
             setTimeout(() => scrollToBottom(false), 50);
         });
@@ -599,6 +610,8 @@ export default function DiscordClient({ socket, user }) {
                                                     <div className="flex min-w-0">
                                                         <img
                                                             src={getProxyUrl(m.author.avatar)}
+                                                            loading="lazy"
+                                                            decoding="async"
                                                             className="app-message-author-avatar w-9 h-9 shrink-0 mx-1 my-0.5 rounded-full object-cover bg-[var(--app-surface-container-highest)]"
                                                             onClick={(e) => openUserPopout(e, m.author)}
                                                             alt=""
@@ -651,6 +664,8 @@ export default function DiscordClient({ socket, user }) {
                                                                         <img
                                                                             key={idx}
                                                                             src={getProxyUrl(att.url)}
+                                                                            loading="lazy"
+                                                                            decoding="async"
                                                                             className="max-h-[300px] max-w-[min(400px,100%)] cursor-pointer rounded-[var(--app-radius-md)]"
                                                                             onClick={() => setPreviewData({ isOpen: true, images: m.attachments.map((a) => a.url), index: idx })}
                                                                             alt=""
@@ -675,7 +690,7 @@ export default function DiscordClient({ socket, user }) {
                                                                             {isLottieSticker(sticker) ? (
                                                                                 <div className="app-sticker-lottie">{sticker.name}</div>
                                                                             ) : (
-                                                                                <img src={getProxyUrl(getStickerUrl(sticker))} alt={sticker.name} />
+                                                                                <img src={getProxyUrl(getStickerUrl(sticker))} loading="lazy" decoding="async" alt={sticker.name} />
                                                                             )}
                                                                         </button>
                                                                     ))}
