@@ -1,0 +1,21 @@
+{
+  "$schema": "./node_modules/wrangler/config-schema.json",
+  "name": "discord-webclient",
+  "compatibility_date": "2026-08-08",
+  "workers_dev": false,
+  "assets": {
+    "directory": "./dist",
+    "html_handling": "drop-trailing-slash",
+    "not_found_handling": "single-page-application"
+  },
+  "routes": [
+    {
+      "pattern": "discord.yexe.xyz/*",
+      "zone_name": "yexe.xyz"
+    },
+    {
+      "pattern": "discord.yexe.net/*",
+      "zone_name": "yexe.net"
+    }
+  ]
+}

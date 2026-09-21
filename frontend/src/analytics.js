@@ -1,5 +1,5 @@
 export function initAnalytics() {
-  const gaId = import.meta.env.VITE_GA_ID;
+  const gaId = import.meta.env.GA_ID || import.meta.env.VITE_GA_ID;
   if (!gaId) return;
 
   const script = document.createElement('script');
@@ -18,7 +18,7 @@ export function initAnalytics() {
 }
 
 export function trackPageView(path) {
-  const gaId = import.meta.env.VITE_GA_ID;
+  const gaId = import.meta.env.GA_ID || import.meta.env.VITE_GA_ID;
   if (!gaId || typeof window.gtag !== 'function') return;
 
   window.gtag('config', gaId, {
