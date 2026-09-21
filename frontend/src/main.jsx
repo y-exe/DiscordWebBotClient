@@ -5,6 +5,9 @@ import { HelmetProvider } from 'react-helmet-async';
 import './material-web.js';
 import './index.css';
 import App from './App.jsx';
+import { initAnalytics } from './analytics.js';
+
+initAnalytics();
 
 class ErrorBoundary extends React.Component {
   constructor(props) {

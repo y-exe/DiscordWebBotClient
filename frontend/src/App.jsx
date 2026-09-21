@@ -3,6 +3,7 @@ import { Routes, Route, useNavigate, Navigate, useLocation } from 'react-router-
 import { io } from 'socket.io-client';
 import { ThemeProvider } from 'next-themes'; 
 import { API_URL } from './utils/helpers';
+import { trackPageView } from './analytics.js';
 import {
   clearPendingLogin,
   commitPendingLogin,
@@ -110,6 +111,10 @@ const RequireAuth = ({ children }) => {
 
 export default function App() {
   const location = useLocation();
+
+  useEffect(() => {
+    trackPageView(location.pathname + location.search);
+  }, [location]);
 
   return (
     <ThemeProvider attribute="class" defaultTheme="system" enableSystem>
