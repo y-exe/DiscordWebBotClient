@@ -42,6 +42,20 @@ const {
 
 const connectionAttempts = new Map();
 
+const saveRawMessage = (client, id, data) => {
+    if (!client || !id || !data) return;
+    if (!client.rawMessageCache) client.rawMessageCache = new Map();
+    const cache = client.rawMessageCache;
+    if (cache.has(id)) cache.delete(id);
+    cache.set(id, data);
+    if (cache.size > 200) {
+        const oldest = cache.keys().next().value;
+        cache.delete(oldest);
+    }
+};
+
+const getRawMessage = (client, id) => client?.rawMessageCache?.get(id) || null;
+
 const setupSocket = (io) => {
     io.use((socket, next) => {
         const address = socket.handshake.address || 'unknown';
@@ -113,23 +127,12 @@ const setupSocket = (io) => {
                 client = new SelfClient({ checkUpdate: false });
             }
 
-            const rawMessageCache = new Map();
-            const saveRawMessage = (id, data) => {
-                if (!id || !data) return;
-                if (rawMessageCache.has(id)) rawMessageCache.delete(id);
-                rawMessageCache.set(id, data);
-                if (rawMessageCache.size > 200) {
-                    const oldest = rawMessageCache.keys().next().value;
-                    rawMessageCache.delete(oldest);
-                }
-            };
-
             if (typeof client.on === 'function') {
                 client.on('raw', (packet) => {
                     if (!packet || typeof packet !== 'object') return;
                     if (packet.t === 'MESSAGE_CREATE' || packet.t === 'MESSAGE_UPDATE') {
                         if (packet.d?.id) {
-                            saveRawMessage(packet.d.id, packet.d);
+                            saveRawMessage(client, packet.d.id, packet.d);
                         }
                     }
                 });
@@ -154,7 +157,7 @@ const setupSocket = (io) => {
 
                 client.on('messageCreate', async (m) => {
                     if (m.channelId === socket.currentChannelId) {
-                        const raw = rawMessageCache.get(m.id) || null;
+                        const raw = getRawMessage(client, m.id);
                         const formatted = await formatMessageWithReference(m, raw);
                         if (formatted) socket.emit('newMessage', formatted);
                     }
@@ -163,7 +166,7 @@ const setupSocket = (io) => {
                 client.on('messageUpdate', async (old, m) => {
                     const target = m || old;
                     if (target?.channelId === socket.currentChannelId) {
-                        const raw = rawMessageCache.get(target.id) || null;
+                        const raw = getRawMessage(client, target.id);
                         const formatted = await formatMessageWithReference(target, raw);
                         if (formatted) socket.emit('messageUpdate', formatted);
                     }
@@ -179,7 +182,7 @@ const setupSocket = (io) => {
                             const msg = reaction.message.partial && typeof reaction.message.fetch === 'function'
                                 ? await reaction.message.fetch()
                                 : reaction.message;
-                            const raw = rawMessageCache.get(msg.id) || null;
+                            const raw = getRawMessage(client, msg.id);
                             const formatted = await formatMessageWithReference(msg, raw);
                             if (formatted) socket.emit('messageUpdate', formatted);
                         } catch (e) { }
@@ -328,11 +331,14 @@ const setupSocket = (io) => {
                 const msgs = await ch.messages.fetch(fetchOptions);
 
                 const formatted = await Promise.all(Array.from(msgs.values()).reverse().map(m => {
-                    const raw = rawMessageCache.get(m.id) || null;
+                    const raw = getRawMessage(client, m.id);
                     return formatMessageWithReference(m, raw);
                 }));
                 cb(formatted.filter(m => m));
-            } catch (e) { cb([]); }
+            } catch (e) {
+                console.error('GetMessages Error:', e.message);
+                cb([]);
+            }
         });
 
         socket.on('sendMessage', async (d, cb = () => { }) => {
