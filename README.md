@@ -2,10 +2,10 @@
 <h1>
   Discord Web Token Client
   
-  [![discord.js-selfbot-v13 3.7.1](https://img.shields.io/badge/discord.js--selfbot--v13-3.7.1-5865F2?style=flat-square&logo=discord&logoColor=white)](https://github.com/aiko-chan-ai/discord.js-selfbot-v13)
-  [![Next.js](https://img.shields.io/badge/Next.js-16-black?style=flat-square&logo=next.js)](https://nextjs.org/)
-  [![express 5.2.1](https://img.shields.io/badge/express-5.2.1-339933?style=flat-square&logo=node.js&logoColor=white)](https://expressjs.com/ja/)
-  [![Licence AGPL-3.0](https://img.shields.io/badge/Licence-AGPL--3.0-green.svg?style=flat-square)](LICENSE)
+  [![discord.js-selfbot](https://img.shields.io/badge/discord.js--selfbot-5865F2?style=flat-square&logo=discord&logoColor=white)](https://github.com/aiko-chan-ai/discord.js-selfbot-v13)
+  [![Next.js](https://img.shields.io/badge/Next.js-000000?style=flat-square&logo=next.js)](https://nextjs.org/)
+  [![express](https://img.shields.io/badge/express-339933?style=flat-square&logo=node.js&logoColor=white)](https://expressjs.com/ja/)
+  [![Licence GPL v3](https://img.shields.io/badge/Licence-GPL%20v3-green.svg?style=flat-square)](LICENSE)
 </h1>
 Socket.io と discord.js-selfbot を使用した、WEB 上のオリジナル Discord クライアント!<br>
 Bot トークンおよびユーザー個人トークンにも一応対応しています。<br>
