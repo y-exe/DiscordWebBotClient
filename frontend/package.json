@@ -43,6 +43,6 @@
     "postcss": "^8.5.6",
     "tailwindcss": "^3.4.1",
     "tailwindcss-animate": "^1.0.7",
-    "wrangler": "^4.136.1"
+    "wrangler": "^4.147.0"
   }
 }
