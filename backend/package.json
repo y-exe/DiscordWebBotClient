@@ -6,7 +6,8 @@
   "scripts": {
     "start": "node server.js",
     "check": "node --check server.js",
-    "audit:production": "npm audit --omit=dev --omit=optional"
+    "audit:production": "npm audit --omit=dev --omit=optional",
+    "test:security": "node --test tests/*.test.js"
   },
   "keywords": [],
   "author": "",

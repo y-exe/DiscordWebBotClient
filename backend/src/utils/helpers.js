@@ -17,8 +17,14 @@ const isPlainObject = (value) => value !== null && typeof value === 'object' && 
 
 const consumeLimit = (map, key, limit, windowMs) => {
     const now = Date.now();
+    if (!map.has(key) && map.size >= 10_000) {
+        for (const [entryKey, entry] of map) {
+            if (now >= entry.resetAt) map.delete(entryKey);
+        }
+        if (map.size >= 10_000) return false;
+    }
     const entry = map.get(key) || { count: 0, resetAt: now + windowMs };
-    if (now > entry.resetAt) {
+    if (now >= entry.resetAt) {
         entry.count = 0;
         entry.resetAt = now + windowMs;
     }
@@ -58,11 +64,13 @@ const decodeCredentialCookie = (value) => {
 const readCredentialCookie = (header, name) => decodeCredentialCookie(parseCookieHeader(header).get(name));
 
 const parseAccountSlot = (value) => {
+    if (typeof value !== 'number' && (typeof value !== 'string' || !/^\d+$/.test(value))) return null;
     const slot = Number(value);
     return Number.isInteger(slot) && slot >= 0 && slot < ACCOUNT_COOKIE_COUNT ? slot : null;
 };
 
 const credentialFromBody = (body = {}) => {
+    if (!isPlainObject(body)) return null;
     const token = typeof body.token === 'string' ? body.token.trim() : '';
     if (!token || token.length > 512 || /[\r\n\0]/.test(token)) return null;
     return { token, isBot: body.isBot === true };
