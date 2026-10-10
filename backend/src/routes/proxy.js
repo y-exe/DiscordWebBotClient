@@ -1,22 +1,14 @@
-const express = require('express');
+const { Hono } = require('hono');
 const dns = require('dns').promises;
-const { rateLimit } = require('express-rate-limit');
 const {
     IMAGE_PROXY_HOSTS,
     MAX_PROXY_BYTES,
     ALLOWED_IMAGE_TYPES,
     MAX_IMAGE_CACHE_BYTES
 } = require('../config');
-const { isPrivateAddress } = require('../utils/helpers');
+const { isPrivateAddress, consumeLimit, clientAddress } = require('../utils/helpers');
 
-const router = express.Router();
-
-const imageProxyLimiter = rateLimit({
-    windowMs: 60_000,
-    limit: 10_000,
-    standardHeaders: 'draft-8',
-    legacyHeaders: false
-});
+const proxy = new Hono();
 
 const imageCache = new Map();
 const imageRequests = new Map();
@@ -24,6 +16,7 @@ let imageCacheBytes = 0;
 let activeImageFetches = 0;
 let cdnCooldownUntil = 0;
 const imageFetchQueue = [];
+const imageProxyHits = new Map();
 
 const cacheImage = (key, image) => {
     if (imageCache.has(key)) imageCacheBytes -= imageCache.get(key).body.length;
@@ -67,9 +60,16 @@ const validateProxyUrl = async (value) => {
     return url;
 };
 
-router.get('/', imageProxyLimiter, async (req, res) => {
+proxy.use(async (c, next) => {
+    if (!consumeLimit(imageProxyHits, clientAddress(c), 10_000, 60_000)) {
+        return c.json({ error: 'Too many requests' }, 429);
+    }
+    await next();
+});
+
+proxy.get('/', async (c) => {
     try {
-        const imageUrl = await validateProxyUrl(req.query.url);
+        const imageUrl = await validateProxyUrl(c.req.query('url'));
         const key = imageUrl.href;
         let image = imageCache.get(key);
         if (image) {
@@ -110,18 +110,19 @@ router.get('/', imageProxyLimiter, async (req, res) => {
                 return result;
             });
         }
-        res.setHeader('Content-Type', image.contentType);
-        res.setHeader('Content-Length', String(image.body.length));
-        res.setHeader('Cache-Control', 'public, max-age=86400, immutable');
-        res.setHeader('X-Content-Type-Options', 'nosniff');
-        return res.send(image.body);
+        return c.body(image.body, 200, {
+            'Content-Type': image.contentType,
+            'Content-Length': String(image.body.length),
+            'Cache-Control': 'public, max-age=86400, immutable',
+            'X-Content-Type-Options': 'nosniff'
+        });
     } catch (error) {
         const status = ['invalid_url', 'host_not_allowed', 'unsafe_address'].includes(error.message) ? 400
             : error.message === 'image_too_large' ? 413
             : error.message === 'cdn_rate_limited' || error.message === 'queue_full' ? 503 : 502;
-        if (status === 503) res.setHeader('Retry-After', String(Math.max(1, Math.ceil((cdnCooldownUntil - Date.now()) / 1000))));
-        return res.status(status).json({ error: status === 400 ? 'Invalid image URL' : 'Image could not be fetched' });
+        if (status === 503) c.header('Retry-After', String(Math.max(1, Math.ceil((cdnCooldownUntil - Date.now()) / 1000))));
+        return c.json({ error: status === 400 ? 'Invalid image URL' : 'Image could not be fetched' }, status);
     }
 });
 
-module.exports = router;
+module.exports = proxy;

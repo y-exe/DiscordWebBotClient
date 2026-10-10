@@ -1,93 +1,135 @@
-const express = require('express');
-const { rateLimit } = require('express-rate-limit');
+const { Hono } = require('hono');
+const { setCookie, deleteCookie } = require('hono/cookie');
 const {
+    IS_PRODUCTION,
     isAllowedOrigin,
     ACCOUNT_COOKIE_COUNT,
     ACCOUNT_COOKIE_MAX_AGE,
     PENDING_COOKIE_MAX_AGE,
     accountCookieName,
-    pendingCookieName,
-    cookieOptions,
-    clearCookieOptions
+    pendingCookieName
 } = require('../config');
 const {
     parseCookieHeader,
     encodeCredentialCookie,
     decodeCredentialCookie,
     parseAccountSlot,
-    credentialFromBody
+    credentialFromBody,
+    consumeLimit,
+    clientAddress
 } = require('../utils/helpers');
 
-const router = express.Router();
+const auth = new Hono();
 
-const authCookieLimiter = rateLimit({
-    windowMs: 60_000,
-    limit: 30,
-    standardHeaders: 'draft-8',
-    legacyHeaders: false
+const JSON_BODY_LIMIT = 4 * 1024;
+const authAttempts = new Map();
+
+auth.use(async (c, next) => {
+    if (!consumeLimit(authAttempts, clientAddress(c), 30, 60_000)) {
+        return c.json({ error: 'Too many requests' }, 429);
+    }
+    if (!isAllowedOrigin(c.req.header('origin'))) {
+        return c.json({ error: 'Origin not allowed' }, 403);
+    }
+    await next();
+    c.header('Cache-Control', 'no-store');
 });
 
-const requireAllowedAuthOrigin = (req, res, next) => {
-    if (!isAllowedOrigin(req.get('origin'))) return res.status(403).json({ error: 'Origin not allowed' });
-    res.setHeader('Cache-Control', 'no-store');
-    return next();
+const readJsonBody = async (c) => {
+    const declared = Number(c.req.header('content-length') || 0);
+    if (Number.isFinite(declared) && declared > JSON_BODY_LIMIT) return 'too-large';
+    let raw = '';
+    try {
+        raw = await c.req.text();
+    } catch {
+        return null;
+    }
+    if (Buffer.byteLength(raw, 'utf8') > JSON_BODY_LIMIT) return 'too-large';
+    if (!raw.trim()) return {};
+    try {
+        return JSON.parse(raw);
+    } catch {
+        return null;
+    }
 };
 
-router.use(authCookieLimiter, requireAllowedAuthOrigin);
+const setAuthCookie = (c, name, value, maxAgeMs) => {
+    setCookie(c, name, value, {
+        httpOnly: true,
+        secure: IS_PRODUCTION,
+        sameSite: 'Strict',
+        path: '/',
+        maxAge: Math.floor(maxAgeMs / 1000)
+    });
+};
 
-router.post('/pending', (req, res) => {
-    const credential = credentialFromBody(req.body);
-    if (!credential) return res.status(400).json({ error: 'Invalid credentials' });
-    res.cookie(pendingCookieName, encodeCredentialCookie(credential.token, credential.isBot), cookieOptions(PENDING_COOKIE_MAX_AGE));
-    return res.status(204).end();
+const clearAuthCookie = (c, name) => {
+    deleteCookie(c, name, {
+        secure: IS_PRODUCTION,
+        sameSite: 'Strict',
+        path: '/'
+    });
+};
+
+const noContent = (c) => c.body(null, 204);
+
+auth.post('/pending', async (c) => {
+    const body = await readJsonBody(c);
+    if (body === 'too-large') return c.json({ error: 'Payload too large' }, 413);
+    const credential = credentialFromBody(body);
+    if (!credential) return c.json({ error: 'Invalid credentials' }, 400);
+    setAuthCookie(c, pendingCookieName, encodeCredentialCookie(credential.token, credential.isBot), PENDING_COOKIE_MAX_AGE);
+    return noContent(c);
 });
 
-router.delete('/pending', (req, res) => {
-    res.clearCookie(pendingCookieName, clearCookieOptions);
-    return res.status(204).end();
+auth.delete('/pending', (c) => {
+    clearAuthCookie(c, pendingCookieName);
+    return noContent(c);
 });
 
-router.post('/accounts/:slot', (req, res) => {
-    const slot = parseAccountSlot(req.params.slot);
-    const credential = credentialFromBody(req.body);
-    if (slot === null || !credential) return res.status(400).json({ error: 'Invalid account' });
-    res.cookie(accountCookieName(slot), encodeCredentialCookie(credential.token, credential.isBot), cookieOptions(ACCOUNT_COOKIE_MAX_AGE));
-    return res.status(204).end();
+auth.post('/accounts/:slot', async (c) => {
+    const slot = parseAccountSlot(c.req.param('slot'));
+    const body = await readJsonBody(c);
+    if (body === 'too-large') return c.json({ error: 'Payload too large' }, 413);
+    const credential = credentialFromBody(body);
+    if (slot === null || !credential) return c.json({ error: 'Invalid account' }, 400);
+    setAuthCookie(c, accountCookieName(slot), encodeCredentialCookie(credential.token, credential.isBot), ACCOUNT_COOKIE_MAX_AGE);
+    return noContent(c);
 });
 
-router.post('/accounts/:slot/commit', (req, res) => {
-    const slot = parseAccountSlot(req.params.slot);
-    const pendingValue = parseCookieHeader(req.headers.cookie).get(pendingCookieName);
+auth.post('/accounts/:slot/commit', (c) => {
+    const slot = parseAccountSlot(c.req.param('slot'));
+    const pendingValue = parseCookieHeader(c.req.header('cookie')).get(pendingCookieName);
     const credential = decodeCredentialCookie(pendingValue);
-    if (slot === null || !credential) return res.status(400).json({ error: 'Pending login not found' });
-    res.cookie(accountCookieName(slot), pendingValue, cookieOptions(ACCOUNT_COOKIE_MAX_AGE));
-    res.clearCookie(pendingCookieName, clearCookieOptions);
-    return res.status(204).end();
+    if (slot === null || !credential) return c.json({ error: 'Pending login not found' }, 400);
+    setAuthCookie(c, accountCookieName(slot), pendingValue, ACCOUNT_COOKIE_MAX_AGE);
+    clearAuthCookie(c, pendingCookieName);
+    return noContent(c);
 });
 
-router.post('/accounts/:slot/refresh', (req, res) => {
-    const slot = parseAccountSlot(req.params.slot);
+auth.post('/accounts/:slot/refresh', (c) => {
+    const slot = parseAccountSlot(c.req.param('slot'));
     const cookieName = slot === null ? null : accountCookieName(slot);
-    const value = cookieName ? parseCookieHeader(req.headers.cookie).get(cookieName) : null;
+    const value = cookieName ? parseCookieHeader(c.req.header('cookie')).get(cookieName) : null;
     const credential = decodeCredentialCookie(value);
-    if (slot === null || !credential) return res.status(400).json({ error: 'Saved account not found' });
-    res.cookie(cookieName, value, cookieOptions(ACCOUNT_COOKIE_MAX_AGE));
-    return res.status(204).end();
+    if (slot === null || !credential) return c.json({ error: 'Saved account not found' }, 400);
+    setAuthCookie(c, cookieName, value, ACCOUNT_COOKIE_MAX_AGE);
+    return noContent(c);
 });
 
-router.delete('/accounts/:slot', (req, res) => {
-    const slot = parseAccountSlot(req.params.slot);
-    if (slot === null) return res.status(400).json({ error: 'Invalid account' });
-    res.clearCookie(accountCookieName(slot), clearCookieOptions);
-    return res.status(204).end();
+auth.delete('/accounts/:slot', (c) => {
+    const slot = parseAccountSlot(c.req.param('slot'));
+    if (slot === null) return c.json({ error: 'Invalid account' }, 400);
+    clearAuthCookie(c, accountCookieName(slot));
+    return noContent(c);
 });
 
-router.delete('/accounts', (req, res) => {
+auth.delete('/accounts', (c) => {
     for (let slot = 0; slot < ACCOUNT_COOKIE_COUNT; slot += 1) {
-        res.clearCookie(accountCookieName(slot), clearCookieOptions);
+        clearAuthCookie(c, accountCookieName(slot));
     }
-    res.clearCookie(pendingCookieName, clearCookieOptions);
-    return res.status(204).end();
+    clearAuthCookie(c, pendingCookieName);
+    return noContent(c);
 });
 
-module.exports = router;
+module.exports = auth;

@@ -1,37 +1,49 @@
 require('dotenv').config();
-const http = require('http');
-const express = require('express');
-const cors = require('cors');
-const helmet = require('helmet');
+const { Hono } = require('hono');
+const { serve } = require('@hono/node-server');
+const { cors } = require('hono/cors');
+const { secureHeaders } = require('hono/secure-headers');
 const { Server } = require('socket.io');
 
 const { corsOptions, isAllowedOrigin } = require('./src/config');
-const authRouter = require('./src/routes/auth');
-const proxyRouter = require('./src/routes/proxy');
+const authApp = require('./src/routes/auth');
+const proxyApp = require('./src/routes/proxy');
 const { setupSocket } = require('./src/socket');
 
-const app = express();
-app.disable('x-powered-by');
+const app = new Hono();
 
-app.use(helmet({
-    crossOriginResourcePolicy: { policy: 'cross-origin' },
+app.use(secureHeaders({
+    crossOriginResourcePolicy: 'cross-origin',
     contentSecurityPolicy: {
-        directives: {
-            defaultSrc: ["'none'"],
-            imgSrc: ["'self'", 'data:'],
-            frameAncestors: ["'none'"],
-            baseUri: ["'none'"],
-        }
+        defaultSrc: ["'none'"],
+        imgSrc: ["'self'", 'data:'],
+        frameAncestors: ["'none'"],
+        baseUri: ["'none'"],
     }
 }));
 
-app.use(cors(corsOptions));
-app.use(express.json({ limit: '4kb' }));
+app.use(cors({
+    origin: (origin) => (origin && isAllowedOrigin(origin) ? origin : undefined),
+    allowMethods: ['GET', 'POST', 'DELETE', 'OPTIONS'],
+    allowHeaders: ['Content-Type'],
+    credentials: true,
+    maxAge: 86400
+}));
 
-app.use('/api/auth', authRouter);
-app.use('/api/image-proxy', proxyRouter);
+app.route('/api/auth', authApp);
+app.route('/api/image-proxy', proxyApp);
 
-const server = http.createServer(app);
+app.notFound((c) => c.json({ error: 'Not found' }, 404));
+app.onError((err, c) => {
+    console.error('[HTTP]', err);
+    return c.json({ error: 'Internal server error' }, 500);
+});
+
+const PORT = Number(process.env.PORT || 8000);
+const server = serve({ fetch: app.fetch, port: PORT }, () => {
+    console.log(`[System] Backend listening on port ${PORT}`);
+});
+
 const io = new Server(server, {
     cors: corsOptions,
     allowRequest: (req, callback) => callback(null, isAllowedOrigin(req.headers.origin)),
@@ -41,6 +53,3 @@ const io = new Server(server, {
 });
 
 setupSocket(io);
-
-const PORT = process.env.PORT || 8000;
-server.listen(PORT, () => console.log(`[System] Backend listening on port ${PORT}`));

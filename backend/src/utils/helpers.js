@@ -33,6 +33,15 @@ const consumeLimit = (map, key, limit, windowMs) => {
     return entry.count <= limit;
 };
 
+const clientAddress = (c) => {
+    const forwarded = c?.req?.header?.('x-forwarded-for');
+    if (typeof forwarded === 'string') {
+        const first = forwarded.split(',')[0].trim();
+        if (first) return first;
+    }
+    return c?.env?.incoming?.socket?.remoteAddress || 'unknown';
+};
+
 const parseCookieHeader = (header = '') => {
     const cookies = new Map();
     for (const part of header.split(';')) {
@@ -125,6 +134,7 @@ module.exports = {
     safeAck,
     isPlainObject,
     consumeLimit,
+    clientAddress,
     parseCookieHeader,
     encodeCredentialCookie,
     decodeCredentialCookie,

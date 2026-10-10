@@ -4,7 +4,7 @@
   
   [![discord.js-selfbot](https://img.shields.io/badge/discord.js--selfbot-5865F2?style=flat-square&logo=discord&logoColor=white)](https://github.com/aiko-chan-ai/discord.js-selfbot-v13)
   [![Next.js](https://img.shields.io/badge/Next.js-000000?style=flat-square&logo=next.js)](https://nextjs.org/)
-  [![express](https://img.shields.io/badge/express-339933?style=flat-square&logo=node.js&logoColor=white)](https://expressjs.com/ja/)
+  [![Hono](https://img.shields.io/badge/Hono-ff6000?style=flat-square&logo=hono&logoColor=white)](https://hono.dev/)
   [![Licence GPL v3](https://img.shields.io/badge/Licence-GPL%20v3-green.svg?style=flat-square)](LICENSE)
 </h1>
 Socket.io と discord.js-selfbot を使用した、WEB 上のオリジナル Discord クライアント!<br>
@@ -49,7 +49,7 @@ Bot トークンおよびユーザー個人トークンにも一応対応して�
 
 ```
 /frontend  Next.js + Tailwind CSS (ほぼMaterial3Expressive)
-/backend   Node.js + Express + Socket.io
+/backend   Node.js + Hono + Socket.io
 ```
 
 ## 免責事項
