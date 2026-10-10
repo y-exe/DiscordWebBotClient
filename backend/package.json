@@ -4,10 +4,9 @@
   "description": "",
   "main": "server.js",
   "scripts": {
-    "start": "node server.js",
-    "check": "node --check server.js",
-    "audit:production": "npm audit --omit=dev --omit=optional",
-    "test:security": "node --test tests/*.test.js"
+    "start": "bun server.js",
+    "audit:production": "bun audit",
+    "test:security": "bun test tests/"
   },
   "keywords": [],
   "author": "",

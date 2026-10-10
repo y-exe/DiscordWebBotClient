@@ -128,9 +128,6 @@ const setupSocket = (io) => {
             }
 
             if (typeof client.on === 'function') {
-                // discord.js-selfbot-youtsuho-v13 forwards WorkerPool shutdown as
-                // client 'error'. Without a listener it becomes an uncaught
-                // exception and kills the process on every disconnect.
                 client.on('error', (error) => console.warn(`[Discord] client error: ${error?.message || error}`));
                 client.on('raw', (packet) => {
                     if (!packet || typeof packet !== 'object') return;

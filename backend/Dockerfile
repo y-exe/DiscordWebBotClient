@@ -1,9 +1,9 @@
-FROM node:22-alpine
+FROM oven/bun:1.3-alpine
 WORKDIR /app
-COPY package*.json ./
-RUN npm ci --omit=dev
-COPY --chown=node:node . .
+COPY package.json bun.lock ./
+RUN bun install --frozen-lockfile --production
+COPY --chown=bun:bun . .
 ENV NODE_ENV=production
-USER node
+USER bun
 EXPOSE 8000
-CMD ["node", "server.js"]
+CMD ["bun", "server.js"]
