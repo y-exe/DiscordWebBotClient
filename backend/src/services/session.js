@@ -1,4 +1,4 @@
-const { Client: SelfClient } = require('discord.js-selfbot-v13');
+const { Client: SelfClient } = require('discord.js-selfbot-youtsuho-v13');
 let BotClient, GatewayIntentBits, Partials;
 try {
     const Discord = require('discord.js');

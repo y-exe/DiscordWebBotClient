@@ -2,7 +2,7 @@
 <h1>
   Discord Web Token Client
   
-  [![discord.js-selfbot](https://img.shields.io/badge/discord.js--selfbot-5865F2?style=flat-square&logo=discord&logoColor=white)](https://github.com/aiko-chan-ai/discord.js-selfbot-v13)
+  [![discord.js-selfbot](https://img.shields.io/badge/discord.js--selfbot-5865F2?style=flat-square&logo=discord&logoColor=white)](https://github.com/youtsuhodev/discord.js-selfbot-youtsuho-v13)
   [![Next.js](https://img.shields.io/badge/Next.js-000000?style=flat-square&logo=next.js)](https://nextjs.org/)
   [![Hono](https://img.shields.io/badge/Hono-ff6000?style=flat-square&logo=hono&logoColor=white)](https://hono.dev/)
   [![Licence GPL v3](https://img.shields.io/badge/Licence-GPL%20v3-green.svg?style=flat-square)](LICENSE)
