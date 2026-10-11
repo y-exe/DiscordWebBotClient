@@ -49,7 +49,7 @@ Bot トークンおよびユーザー個人トークンにも一応対応して�
 
 ```
 /frontend  Next.js + Tailwind CSS (ほぼMaterial3Expressive)
-/backend   Node.js + Hono + Socket.io
+/backend   Bun + Hono + Socket.io
 ```
 
 ## 免責事項
@@ -60,9 +60,27 @@ Bot トークンおよびユーザー個人トークンにも一応対応して�
 > 本サービスの利用によりアカウントが停止、削除、または制限された場合でも、開発者は一切の責任を負いません。
 > すべて自己責任において利用してください。
 
+## 開発ツール
+
+Bun 1.3.14、Biome、Turborepoを使用します。
+
+```bash
+bun run bootstrap
+bun run dev
+```
+
+| コマンド | 内容 |
+|---|---|
+| `bun run check` | lint・セキュリティテスト |
+| `bun run build` | フロントエンドのビルド |
+| `bun run lint:react` | React用ESLint検査 |
+| `bun run format` | コード整形 |
+
+Cloudflare用ビルドは `frontend/` で `npm run build` を実行します。依存変更時は、Bunとnpm/Docker用のロックファイルを更新してください。
+
 ## ライセンス
 
-[GPL-3.0](LICENSE)  
+[GPL-3.0](LICENSE)
 
 ---
 © 2026 yexe.xyz

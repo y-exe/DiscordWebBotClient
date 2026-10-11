@@ -1,4 +1,6 @@
 const nextConfig = {
+  turbopack: { root: process.cwd() },
+  outputFileTracingRoot: process.cwd(),
   agentRules: false,
   env: {
     GA_ID: process.env.GA_ID,

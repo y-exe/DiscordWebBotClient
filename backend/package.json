@@ -6,7 +6,8 @@
   "scripts": {
     "start": "bun server.js",
     "audit:production": "bun audit",
-    "test:security": "bun test tests/"
+    "test:security": "bun test tests/",
+    "dev": "bun --watch server.js"
   },
   "keywords": [],
   "author": "",

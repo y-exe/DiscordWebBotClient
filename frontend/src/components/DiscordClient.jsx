@@ -427,7 +427,7 @@ export default function DiscordClient({ socket, user }) {
                         oscillator.start();
                         oscillator.stop(context.currentTime + 0.14);
                         oscillator.onended = () => context.close();
-                    } catch { /* Autoplay policies may block notification audio. */ }
+                    } catch {   }
                 }
             }
         };

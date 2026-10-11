@@ -32,7 +32,6 @@ const safeMetadata = (account, fallbackSlot = 0) => {
 export const loadAccountHistory = () => {
   if (typeof window === 'undefined') return [];
   try {
-    // 1. 新キー (v2)
     const rawV2 = localStorage.getItem(HISTORY_KEY);
     if (rawV2) {
       const parsed = JSON.parse(rawV2);
@@ -42,7 +41,6 @@ export const loadAccountHistory = () => {
       }
     }
 
-    // 2. localStorage の全キーから 'history' を含むキーを探索
     for (let i = 0; i < localStorage.length; i += 1) {
       const key = localStorage.key(i);
       if (key && key.includes('history')) {
@@ -59,7 +57,6 @@ export const loadAccountHistory = () => {
       }
     }
 
-    // 3. Cookie からの探索
     const legacyCookie = readLegacyHistory();
     if (legacyCookie.length > 0) {
       const sanitized = legacyCookie.map((item, index) => safeMetadata(item, index)).filter(Boolean).slice(0, ACCOUNT_LIMIT);

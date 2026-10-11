@@ -1,22 +1,20 @@
 node_modules/
 
-# env
 .env
 .env.local
 .env.development.local
 .env.test.local
 .env.production.local
 
-# Build
 frontend/dist/
 backend/dist/
 
-# IDE
 .vscode/
 .idea/
 *.swp
 *.swo
 
-# OS
 .DS_Store
 Thumbs.db
+**/.turbo/
+**/*.tsbuildinfo

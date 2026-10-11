@@ -4,14 +4,15 @@
   "version": "0.2.0",
   "type": "module",
   "scripts": {
-    "dev": "next dev --hostname 0.0.0.0 --port 5173",
+    "dev": "bun --bun next dev --hostname 0.0.0.0 --port 5173",
     "build": "opennextjs-cloudflare build",
-    "build:next": "next build",
+    "build:next": "bun --bun next build",
     "lint": "eslint .",
     "preview": "opennextjs-cloudflare build && opennextjs-cloudflare preview",
-    "start": "next start",
+    "start": "bun --bun next start",
     "deploy": "opennextjs-cloudflare build && opennextjs-cloudflare deploy",
-    "cf-typegen": "wrangler types --env-interface CloudflareEnv cloudflare-env.d.ts"
+    "cf-typegen": "wrangler types --env-interface CloudflareEnv cloudflare-env.d.ts",
+    "build:cloudflare": "next build --webpack"
   },
   "dependencies": {
     "@material/web": "^2.4.1",

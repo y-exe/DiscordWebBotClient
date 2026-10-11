@@ -1,0 +1,29 @@
+{
+  "name": "discord-web-bot-client",
+  "private": true,
+  "packageManager": "bun@1.3.14",
+  "workspaces": [
+    "backend"
+  ],
+  "scripts": {
+    "dev": "turbo run dev frontend:dev",
+    "build": "turbo run frontend:build",
+    "test": "turbo run test:security",
+    "lint": "biome lint .",
+    "lint:fix": "biome lint --write .",
+    "format": "biome format --write .",
+    "format:check": "biome format .",
+    "check": "bun run lint && bun run test",
+    "lint:react": "bun run --cwd frontend lint",
+    "bootstrap": "bun install --frozen-lockfile && bun install --cwd frontend --frozen-lockfile",
+    "frontend:dev": "bun run --cwd frontend dev",
+    "frontend:build": "bun run --cwd frontend build:next"
+  },
+  "devDependencies": {
+    "@biomejs/biome": "2.5.15",
+    "turbo": "2.11.7"
+  },
+  "engines": {
+    "bun": ">=1.3.14"
+  }
+}

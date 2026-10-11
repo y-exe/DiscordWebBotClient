@@ -5,6 +5,10 @@ on:
     branches: [ main ]
     paths:
       - 'backend/**'
+      - 'package.json'
+      - 'bun.lock'
+      - 'biome.json'
+      - 'turbo.json'
       - '.github/workflows/ghcr-publish.yml'
   workflow_dispatch:
 
@@ -12,7 +16,20 @@ env:
   REGISTRY: ghcr.io
 
 jobs:
+  verify:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: 1.3.14
+      - run: bun run bootstrap
+      - run: bun run check
+
   build-and-push:
+    needs: verify
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -49,4 +66,4 @@ jobs:
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
           cache-from: type=gha
-          cache-to: type=gha,mode=max
+          cache-to: type=gha,mode=max
