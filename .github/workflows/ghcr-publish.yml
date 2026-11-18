@@ -75,11 +75,11 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       contents: read
-    env:
-      VPS_GITOPS_TOKEN: ${{ secrets.VPS_GITOPS_TOKEN }}
-    if: env.VPS_GITOPS_TOKEN != ''
     steps:
       - name: Bump restartedAt in GitOps repo
+        if: ${{ secrets.VPS_GITOPS_TOKEN != '' }}
+        env:
+          VPS_GITOPS_TOKEN: ${{ secrets.VPS_GITOPS_TOKEN }}
         run: |
           git clone --depth 1 https://x-access-token:${VPS_GITOPS_TOKEN}@github.com/y-exe/vps.git vps
           cd vps
