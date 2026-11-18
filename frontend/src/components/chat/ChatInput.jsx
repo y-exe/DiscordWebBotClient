@@ -379,9 +379,9 @@ const ChatInput = ({ channelName, disabled, onSend, onTyping, replyingTo, onCanc
 
       <div className="app-composition-row">
         <div className="app-message-box-base" data-append={showSendButton}>
-          <div className="shrink-0 flex items-center justify-center self-center w-[42px]">
+          <div className="app-inline-icon app-inline-icon-normal">
             <md-icon-button type="button" class="m3-icon-button" onClick={() => fileInputRef.current?.click()} title="ファイルを添付">
-              <Symbol size={22}>add</Symbol>
+              <Symbol size={24}>add</Symbol>
             </md-icon-button>
             <input type="file" hidden multiple ref={fileInputRef} onChange={(e) => addFiles(e.target.files)} />
           </div>
@@ -425,19 +425,21 @@ const ChatInput = ({ channelName, disabled, onSend, onTyping, replyingTo, onCanc
             disabled={disabled || sending}
           />
 
-          <div className="shrink-0 flex items-center gap-0.5">
+          <div className="app-message-box-end">
             {text.length > 3800 && (
               <span
                 className="app-composition-counter"
-                style={{ color: text.length >= 4000 ? 'var(--app-error)' : 'var(--app-outline)' }}
+                style={{ color: text.length >= 4000 ? 'var(--app-error)' : undefined }}
                 title="残り文字数"
               >
                 {4000 - text.length}
               </span>
             )}
-            <md-icon-button type="button" class="m3-icon-button" onClick={onEmojiClick} title="絵文字">
-              <Symbol size={22}>mood</Symbol>
-            </md-icon-button>
+            <div className="app-inline-icon app-inline-icon-normal">
+              <md-icon-button type="button" class="m3-icon-button" onClick={onEmojiClick} title="絵文字">
+                <Symbol size={24}>mood</Symbol>
+              </md-icon-button>
+            </div>
           </div>
         </div>
 
@@ -449,7 +451,7 @@ const ChatInput = ({ channelName, disabled, onSend, onTyping, replyingTo, onCanc
             onClick={handleSubmit}
             title="メッセージを送信"
           >
-            <Symbol size={22} fill>send</Symbol>
+            <Symbol size={24} fill>send</Symbol>
           </button>
         )}
       </div>

@@ -1,5 +1,5 @@
 {
-  "name": "DiscordWebTokenClient-web",
+  "name": "materialcord-web",
   "private": true,
   "version": "0.2.0",
   "type": "module",
@@ -8,9 +8,10 @@
     "build": "opennextjs-cloudflare build",
     "build:next": "bun --bun next build",
     "lint": "eslint .",
+    "pages:build": "opennextjs-cloudflare build && node scripts/pack-pages.mjs",
+    "pages:deploy": "wrangler pages deploy",
     "preview": "opennextjs-cloudflare build && opennextjs-cloudflare preview",
     "start": "bun --bun next start",
-    "deploy": "opennextjs-cloudflare build && opennextjs-cloudflare deploy",
     "cf-typegen": "wrangler types --env-interface CloudflareEnv cloudflare-env.d.ts",
     "build:cloudflare": "next build --webpack"
   },

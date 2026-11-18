@@ -1,0 +1,9 @@
+name = "materialcord"
+main = "worker.js"
+compatibility_date = "2026-06-02"
+workers_dev = true
+
+[vars]
+VPS_ORIGIN = "https://dapi.yexe.xyz"
+ALLOWED_ORIGIN = "https://ycord.pages.dev"
+ALLOWED_ORIGIN_PATTERN = "ycord.pages.dev"

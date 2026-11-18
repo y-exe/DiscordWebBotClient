@@ -1,6 +1,6 @@
 const widths = [62, 44, 75, 54, 68, 36, 59, 78, 42, 64, 51, 72, 47, 66];
 
-export default function ChatLoadingContent() {
+export default function LoadingContent() {
   return (
     <div className="app-chat-loading-content" role="status" aria-label="チャットを読み込み中">
       {widths.map((width, index) => (

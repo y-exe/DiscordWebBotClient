@@ -3,7 +3,7 @@
   "configVersion": 0,
   "workspaces": {
     "": {
-      "name": "discordwebtokenclient-backend",
+      "name": "materialcord-backend",
       "dependencies": {
         "@hono/node-server": "^1.13.7",
         "discord.js": "^14.27.0",

@@ -86,7 +86,7 @@ const EmojiPicker = ({ currentGuild, guildEmojis, emojiGroups, onEmoji }) => {
     <div className="app-picker-panel">
       <SearchField value={query} onChange={setQuery} placeholder="絵文字を検索..." />
       <div className="app-picker-body">
-        {/* for-web サーバーレール相当: クリックでセクションへジャンプ */}
+        {/* for-web: サーバーレール */}
         {groups.length > 0 && (
           <div className="app-emoji-rail no-scrollbar">
             {groups.map((group) => (

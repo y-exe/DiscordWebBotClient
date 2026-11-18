@@ -10,12 +10,6 @@
   animation: pulse-slow 8s cubic-bezier(0.4, 0, 0.6, 1) infinite;
 }
 
-@keyframes viewer-zoom {
-  from { transform: scale(0.9); opacity: 0; }
-  to { transform: scale(1); opacity: 1; }
-}
-.animate-viewer-zoom { animation: viewer-zoom 0.25s cubic-bezier(0.2, 0, 0, 1) forwards; }
-
 @keyframes rolling-up {
   from { transform: translateY(100%); opacity: 0; }
   to { transform: translateY(0); opacity: 1; }

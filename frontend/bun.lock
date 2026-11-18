@@ -3,7 +3,7 @@
   "configVersion": 0,
   "workspaces": {
     "": {
-      "name": "DiscordWebTokenClient-web",
+      "name": "materialcord-web",
       "dependencies": {
         "@material/web": "^2.4.1",
         "@opennextjs/cloudflare": "^1.20.6",

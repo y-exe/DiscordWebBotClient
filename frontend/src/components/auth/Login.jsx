@@ -119,7 +119,7 @@ export default function Login() {
                         <FaDiscord className="text-[#5865F2]" /><span className="text-xs font-bold text-gray-600 dark:text-gray-300 tracking-wide font-ggsans">DISCORD</span>
                     </Motion.div>
                     <Motion.h2 variants={entranceVariants} className="text-4xl md:text-5xl font-bold tracking-tight text-gray-900 dark:text-white mb-2 leading-tight font-google">高速軽量 Socket.io</Motion.h2>
-                    <Motion.h1 variants={entranceVariants} className="text-4xl md:text-5xl font-bold tracking-tight text-transparent bg-clip-text bg-gradient-to-r from-[#5865F2] to-[#404EED] mb-6 leading-tight font-google">Discord Web Token Client</Motion.h1>
+                    <Motion.h1 variants={entranceVariants} className="text-4xl md:text-5xl font-bold tracking-tight text-transparent bg-clip-text bg-gradient-to-r from-[#5865F2] to-[#404EED] mb-6 leading-tight font-google">materialcord</Motion.h1>
                     <Motion.p variants={entranceVariants} className="text-gray-500 dark:text-gray-400 max-w-xl mx-auto text-sm md:text-base leading-relaxed">
                         Bot/UserのTokenをWebブラウザで動かせるオープンソースプロジェクトです。<br/>
                         軽量化や、複数アカウントのプレビュー確認などに最適です。

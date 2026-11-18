@@ -3,8 +3,8 @@ import '../App.css';
 import Providers from './providers';
 
 export const metadata = {
-  metadataBase: new URL('https://discord.yexe.xyz'),
-  title: { default: 'Stoat', template: '%s | Stoat' },
+  metadataBase: new URL('https://ycord.pages.dev'),
+  title: { default: 'materialcord', template: '%s | materialcord' },
   description: 'ブラウザで動作する Discord クライアント',
 };
 
@@ -16,9 +16,8 @@ export default function RootLayout({ children }) {
   return (
     <html lang="ja" suppressHydrationWarning>
       <head>
-        <link rel="shortcut icon" type="image/x-icon" href="/assets/web/icon.ico" />
-        <link rel="icon" type="image/svg+xml" href="/assets/web/monochrome.svg" />
-        <link rel="apple-touch-icon" href="/assets/web/android-chrome-192x192.png" />
+        <link rel="shortcut icon" type="image/x-icon" href="/fabicon.ico" />
+        <link rel="icon" type="image/x-icon" href="/fabicon.ico" />
       </head>
       <body><Providers>{children}</Providers></body>
     </html>

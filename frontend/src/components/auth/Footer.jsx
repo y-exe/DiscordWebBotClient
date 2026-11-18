@@ -6,8 +6,8 @@ export default function Footer({ forceDark = false }) {
     { 
         title: "Project", 
         links: [
-            { text: "GitHub", url: "https://github.com/y-exe/discord-token-webclient" }, 
-            { text: "Commitlog", url: "https://github.com/y-exe/discord-token-webclient/commits/main/" }
+            { text: "GitHub", url: "https://github.com/y-exe/MaterialCord" }, 
+            { text: "Commitlog", url: "https://github.com/y-exe/MaterialCord/commits/main/" }
         ] 
     },
     { 
@@ -31,7 +31,7 @@ export default function Footer({ forceDark = false }) {
           <div className="max-w-sm text-center lg:text-left">
             <div className="flex items-center justify-center lg:justify-start gap-2 mb-4">
               <FaDiscord size={24} className="text-[#5865F2]" />
-              <span className={`font-bold text-lg ${forceDark ? 'text-white' : 'text-gray-900 dark:text-white'} font-google tracking-tight`}>Discord Web Token Client</span>
+              <span className={`font-bold text-lg ${forceDark ? 'text-white' : 'text-gray-900 dark:text-white'} font-google tracking-tight`}>materialcord</span>
             </div>
             <p className={`text-sm ${forceDark ? 'text-gray-400' : 'text-gray-500 dark:text-gray-400'} leading-relaxed font-google`}>
               ブラウザ上で動作する軽量なDiscordクライアント。

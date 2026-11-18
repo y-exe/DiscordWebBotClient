@@ -1,14 +1,23 @@
 # アーキテクチャ
 
 ```
-Browser (Next.js :5173)
-   │  HTTP (/api/*)          Socket.IO
-   ▼                            ▼
-Backend (Hono :8000) ── Socket.IO ──┘
+Browser
+   │  HTTP / WebSocket
+   ▼
+ycord.pages.dev (Cloudflare Pages / Next.js)
+   │  /api/*  /socket.io/*
+   ▼
+materialcord.yexe.workers.dev (Workers プロキシ: backend を隠蔽)
+   │
+   ▼
+dapi.yexe.xyz (VPS nginx → k3s discord-xyz-backend / Hono :8000)
    │  REST / Gateway (discord.js-selfbot / discord.js)
    ▼
 Discord API
 ```
+
+開発時は Pages / プロキシを経由せず、frontend (`:5173`) が Next.js の rewrite で
+直接 backend (`:8000`) に接続します。
 
 ## バックエンド (`backend/`)
 

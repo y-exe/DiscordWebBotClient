@@ -2545,15 +2545,108 @@ body {
   height: 17px;
 }
 
-.m3-viewer-button {
-  --md-icon-button-icon-color: rgba(255, 255, 255, .72);
-  --md-icon-button-hover-icon-color: #fff;
-  --md-icon-button-pressed-icon-color: #fff;
-  --md-icon-button-focus-icon-color: #fff;
+/* for-web ImageViewerModal: スクライム32% + スケールイン、ツールバーはカード式 */
+.app-image-viewer {
+  position: fixed;
+  inset: 0;
+  z-index: 998;
+  display: flex;
+  background: rgba(from var(--md-sys-color-scrim) r g b / 0.32);
+}
+
+.app-image-viewer-inner {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  width: 100%;
+  height: 100%;
+  min-height: 0;
+  padding-inline: 20px;
+  animation: app-viewer-in 0.3s cubic-bezier(0.17, 0.67, 0.58, 0.98);
+}
+
+@keyframes app-viewer-in {
+  from {
+    opacity: 0;
+    transform: scale(1.1);
+  }
+
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+.app-image-viewer-bar {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 120px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  pointer-events: none;
+}
+
+.app-viewer-card {
+  z-index: 999;
+  display: flex;
+  align-items: center;
+  gap: var(--app-gap-md);
+  padding: var(--app-gap-md);
+  border-radius: var(--app-radius-lg);
+  background: var(--md-sys-color-surface);
+  color: var(--md-sys-color-on-surface);
+  pointer-events: auto;
+}
+
+.app-viewer-card-text {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  max-width: 320px;
+}
+
+.app-viewer-title {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 0.875rem;
+  font-weight: 550;
+}
+
+.app-viewer-label {
+  font-size: 0.75rem;
+  color: var(--app-on-surface-variant);
+}
+
+.app-viewer-card .m3-icon-button {
+  --md-icon-button-icon-color: var(--app-on-surface-variant);
+  --md-icon-button-hover-icon-color: var(--app-on-surface);
+  --md-icon-button-selected-icon-color: var(--app-on-surface);
+  --md-icon-button-focus-icon-color: var(--app-on-surface);
+}
+
+/* for-web Image: 中央寄せ / contain / 黒60%背景、ズーム・パン対応 */
+.app-image-viewer-image {
+  min-height: 0;
+  align-self: center;
+  justify-self: center;
+  max-width: 100%;
+  max-height: 100%;
+  margin-inline: auto;
+  object-fit: contain;
+  background: rgba(0, 0, 0, 0.6);
+  touch-action: none;
+  user-select: none;
+  cursor: grab;
 }
 
 .m3-viewer-nav {
   position: absolute;
+  top: calc(50% - 28px);
   z-index: 1010;
   width: 56px;
   height: 56px;
@@ -2576,18 +2669,22 @@ body {
 
 .app-composition {
   flex-shrink: 0;
-  padding: 0 var(--app-gap-md) 20px;
+  padding: 0 var(--app-gap-md) var(--app-gap-md);
   min-width: 0;
 }
 
+/* for-web MessageBox: padding 4px 8px / 上角28px・送信ボタンあり時は下部角12px */
 .app-message-box-base {
   flex: 1;
   min-width: 0;
   display: flex;
-  align-items: center;
+  align-items: stretch;
   padding-block: var(--app-gap-sm);
   padding-inline: var(--app-gap-md) var(--app-gap-md);
-  border-radius: var(--app-radius-xl);
+  border-start-start-radius: var(--app-radius-xl);
+  border-start-end-radius: var(--app-radius-xl);
+  border-end-start-radius: var(--app-radius-xl);
+  border-end-end-radius: var(--app-radius-xl);
   color: var(--app-on-surface);
   background: var(--app-surface-container-high);
 }
@@ -2620,12 +2717,16 @@ body {
   line-height: 22px;
 }
 
+.app-message-box-base textarea::placeholder {
+  color: var(--app-outline);
+}
+
+/* for-web InlineIcon: アイコンはピル最下部に寄せる */
 .app-inline-icon {
   flex-shrink: 0;
   display: flex;
-  align-items: center;
+  align-items: flex-end;
   justify-content: center;
-  align-self: center;
 }
 
 .app-inline-icon-normal {
@@ -2636,11 +2737,13 @@ body {
   width: 62px;
 }
 
+/* for-web ActionContainer(column): カウンターが絵文字ボタンの上に付く */
 .app-message-box-end {
   flex-shrink: 0;
   display: flex;
-  align-items: center;
-  gap: 2px;
+  flex-direction: column;
+  align-items: flex-end;
+  justify-content: flex-end;
 }
 
 /* for-web: 送信ボタンはピルの外側に独立した48px幅ブロック
@@ -2654,8 +2757,8 @@ body {
 }
 
 .app-message-box-base[data-append='true'] {
-  border-top-right-radius: var(--app-radius-md);
-  border-bottom-right-radius: var(--app-radius-md);
+  border-end-start-radius: var(--app-radius-md);
+  border-end-end-radius: var(--app-radius-md);
 }
 
 /* autocomplete: メンション補完ポップアップ */
@@ -2724,24 +2827,24 @@ body {
   white-space: nowrap;
 }
 
-/* for-web MessageBox: 送信ボタン有効時は入力欄の下部角が radius-md */
-.app-message-box-base[data-append="true"] {
-  border-end-start-radius: var(--app-radius-md);
-  border-end-end-radius: var(--app-radius-md);
-}
-
+/* for-web IconButton(_compositionSendMessage): 左角12px / 右角28px */
 .app-send-button {
   width: 48px;
   flex-shrink: 0;
   align-self: stretch;
+  position: relative;
   display: grid;
   place-items: center;
   border: none;
-  border-radius: var(--app-radius-md);
+  border-start-start-radius: var(--app-radius-md);
+  border-end-start-radius: var(--app-radius-md);
+  border-start-end-radius: var(--app-radius-xl);
+  border-end-end-radius: var(--app-radius-xl);
+  overflow: hidden;
   cursor: pointer;
   color: var(--app-on-secondary-container);
   background: var(--app-secondary-container);
-  transition: background-color 0.15s ease-in-out, transform 0.1s ease-in-out;
+  transition: var(--app-transition-fast) all;
 }
 
 .app-send-button.is-filled {
@@ -2749,38 +2852,39 @@ body {
   background: var(--app-primary);
 }
 
-.app-send-button:hover:not(:disabled) {
-  filter: brightness(1.1);
+/* M3 state layer (for-web の Ripple 相当) */
+.app-send-button::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: currentColor;
+  opacity: 0;
+  transition: opacity var(--app-transition-fast);
+  pointer-events: none;
 }
 
-.app-send-button:active:not(:disabled) {
-  transform: scale(0.97);
+.app-send-button:hover:not(:disabled)::after {
+  opacity: 0.08;
 }
 
-.app-send-button:hover {
-  background: color-mix(in srgb, var(--app-primary-container) 80%, var(--app-on-surface));
+.app-send-button:active:not(:disabled)::after {
+  opacity: 0.12;
 }
 
-.app-send-button:active {
-  transform: scale(0.9);
-}
-
+/* for-web: 無効時は 10% on-surface 背景 / 38% on-surface 色 */
 .app-send-button:disabled {
-  opacity: 0.38;
   cursor: default;
-  transform: none;
-}
-
-.app-send-button:disabled:hover {
-  filter: none;
-  background: var(--app-secondary-container);
+  color: color-mix(in srgb, var(--app-on-surface) 38%, transparent);
+  background: color-mix(in srgb, var(--app-on-surface) 10%, transparent);
 }
 
 .app-composition-counter {
+  display: flex;
+  align-items: center;
+  height: 1.5em;
   font-size: 12px;
   font-weight: 700;
   font-variant-numeric: tabular-nums;
-  margin-right: 2px;
 }
 
 /* for-web: リアクション (padding 8px / 角丸12px / weight 600 / tabular) */

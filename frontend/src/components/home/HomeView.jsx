@@ -1,5 +1,4 @@
 import Symbol from '../common/Symbol';
-import Wordmark from '../auth/Wordmark';
 
 /**
  * for-web HomePage: @me ルート(チャンネル未選択)のホーム画面
@@ -12,14 +11,17 @@ const HomeView = ({ onCreate, onOpenSettings }) => (
       <div className="hidden min-w-0 flex-1 sm:block" />
     </header>
     <div className="min-h-0 flex-1 overflow-y-auto flex flex-col items-center justify-center gap-8 py-12">
-      <Wordmark
+      <span
         aria-hidden="true"
         style={{
-          width: '160px',
-          height: 'auto',
+          fontSize: '28px',
+          fontWeight: 700,
+          letterSpacing: '-0.02em',
           color: 'var(--app-on-surface)',
         }}
-      />
+      >
+        materialcord
+      </span>
       <div className="app-home-buttons">
         <div className="app-home-buttons-col">
           <button type="button" className="app-home-category-button" onClick={onCreate}>

@@ -18,6 +18,8 @@ bun run tokens
 ## セキュリティ
 
 - トークンは HttpOnly Cookie にのみ保存され、バックエンドの DB やファイルには残りません
+- 本番の Cookie は `SameSite=None; Secure` (Pages と Workers プロキシがクロスサイトのため)。
+  CSRF 対策は `ALLOWED_ORIGINS` によるオリジン検証で行う
 - `ALLOWED_ORIGINS` は本番で必ず設定してください(未設定の場合オリジンを持つリクエストはすべて拒否されます)
 - 画像プロキシは `IMAGE_PROXY_HOSTS` に列挙したホスト以外を中継しません
 - ソケット・HTTP ともにレート制限があります(詳細は [architecture.md](../development/architecture.md))
@@ -27,6 +29,7 @@ bun run tokens
 | 症状 | 原因と対処 |
 |---|---|
 | ログインで `Token vault request failed (500)` | backend が起動していない。開発時は Next.js の rewrite 先(`:8000`)が不在だと 500 になる |
-| ログインで 403 | アクセス元オリジンが `ALLOWED_ORIGINS` にない。開発時は `http://localhost:5173` が自動許可される |
+| ログインで 403 `Origin not allowed` | アクセス元オリジンが backend の `ALLOWED_ORIGINS` にない(本番は `https://ycord.pages.dev` が必要) |
 | `Rate limited` / 429 | ソケット・HTTP のレート制限に達した。しばらく待ってから再試行 |
 | ログイン後に画面が真っ暗 / エラー | ブラウザーコンソールを確認。拡張機能による hydration 警告は無害な場合がある |
+| Pages / Worker が 500 (error 1101) | `wrangler pages deployment tail` でランタイム例外を確認 |

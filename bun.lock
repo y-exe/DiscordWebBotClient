@@ -3,14 +3,14 @@
   "configVersion": 1,
   "workspaces": {
     "": {
-      "name": "discord-web-bot-client",
+      "name": "materialcord",
       "devDependencies": {
         "@biomejs/biome": "2.5.15",
         "turbo": "2.11.7",
       },
     },
     "backend": {
-      "name": "discordwebtokenclient-backend",
+      "name": "materialcord-backend",
       "version": "1.0.0",
       "dependencies": {
         "@hono/node-server": "^1.13.7",
@@ -175,7 +175,7 @@
 
     "discord.js-selfbot-youtsuho-v13": ["discord.js-selfbot-youtsuho-v13@3.7.8", "", { "dependencies": { "@discordjs/builders": "^1.6.3", "@discordjs/collection": "^2.1.1", "@sapphire/async-queue": "^1.5.5", "@sapphire/shapeshift": "^4.0.0", "@snazzah/davey": "^0.1.11", "discord-api-types": "^0.38.15", "fetch-cookie": "^3.1.0", "find-process": "^2.0.0", "otplib": "^12.0.1", "prism-media": "^1.3.5", "qrcode": "^1.5.4", "tough-cookie": "^5.1.2", "tree-kill": "^1.2.2", "undici": "^7.11.0", "werift-rtp": "^0.8.4", "ws": "^8.16.0" } }, "sha512-tRXEY6whOtFewUMm4kKTp9x55yOEKJGjYZirpOI3QrJlkdkIOpf8BIrLTEiHHPcvBD1gk+YomvgVwAogK7+i4w=="],
 
-    "discordwebtokenclient-backend": ["discordwebtokenclient-backend@workspace:backend"],
+    "discordwebtokenclient-backend": ["materialcord-backend@workspace:backend"],
 
     "dotenv": ["dotenv@17.4.2", "", {}, "sha512-nI4U3TottKAcAD9LLud4Cb7b2QztQMUEfHbvhTH09bqXTxnSie8WnjPALV/WMCrJZ6UV/qHJ6L03OqO3LcdYZw=="],
 

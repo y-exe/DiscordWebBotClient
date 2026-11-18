@@ -67,3 +67,25 @@ jobs:
           labels: ${{ steps.meta.outputs.labels }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
+
+  # yexeserver (k3s) への反映: GitOps リポジトリの restartedAt を更新して Argo にロールアウトさせる。
+  # VPS_GITOPS_TOKEN (y-exe/vps への書き込み権限付きPAT) が設定されている場合のみ実行。
+  rollout:
+    needs: build-and-push
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    env:
+      VPS_GITOPS_TOKEN: ${{ secrets.VPS_GITOPS_TOKEN }}
+    if: env.VPS_GITOPS_TOKEN != ''
+    steps:
+      - name: Bump restartedAt in GitOps repo
+        run: |
+          git clone --depth 1 https://x-access-token:${VPS_GITOPS_TOKEN}@github.com/y-exe/vps.git vps
+          cd vps
+          node "$GITHUB_WORKSPACE/.github/scripts/bump-rollout.mjs" apps/discord-xyz-backend/app.yaml
+          git config user.name "materialcord-deploy"
+          git config user.email "actions@users.noreply.github.com"
+          git add apps/discord-xyz-backend/app.yaml
+          git commit -m "chore: discord-xyz-backendを再ロールアウト (${GITHUB_SHA::7})"
+          git push

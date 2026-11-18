@@ -3,7 +3,7 @@ import { FaChevronRight } from 'react-icons/fa6';
 import Symbol from '../common/Symbol';
 import { getProxyUrl } from '../../utils/helpers';
 import { useTwemoji } from '../../hooks/useTwemoji';
-import SidebarLoadingContent from './SidebarLoadingContent';
+import LoadingContent from './LoadingContent';
 
 const AnnouncementIcon = ({ size = 18 }) => (
   <svg aria-hidden="true" role="img" xmlns="http://www.w3.org/2000/svg" width={size} height={size} fill="none" viewBox="0 0 24 24">
@@ -180,7 +180,7 @@ const ChannelSidebar = ({
           </div>
         )}
 
-        {loading && <SidebarLoadingContent isDMList={isDMList} />}
+        {loading && <LoadingContent isDMList={isDMList} />}
         {!loading && channels.map((cat) => {
           const catId = cat.id || 'uncategorized';
           const isCollapsed = collapsedCategories.has(catId);

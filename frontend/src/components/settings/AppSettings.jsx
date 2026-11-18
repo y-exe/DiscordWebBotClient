@@ -142,7 +142,7 @@ const AppSettings = ({
             {
                 title: null,
                 entries: [
-                    { href: 'https://github.com/y-exe/DiscordWebBotClient', title: 'ソースコード', icon: <Symbol size={20}>memory</Symbol> },
+                    { href: 'https://github.com/y-exe/MaterialCord', title: 'ソースコード', icon: <Symbol size={20}>memory</Symbol> },
                     { id: 'advanced', title: '詳細設定', icon: <Symbol size={20}>science</Symbol> },
                     { id: 'logout', title: 'ログアウト', icon: <Symbol size={20}>logout</Symbol>, danger: true, action: 'logout' },
                 ],

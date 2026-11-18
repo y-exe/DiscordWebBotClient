@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'react';
 import Symbol from '../common/Symbol';
 import { getProxyUrl } from '../../utils/helpers';
-import ChatLoadingContent from '../chat/ChatLoadingContent';
+import LoadingContent from '../chat/LoadingContent';
 
 const STATUS_LABELS = {
   online: 'オンライン',
@@ -133,7 +133,7 @@ const FriendsView = ({ friends = [], loading = false, onUserClick, onUserContext
         </nav>
 
         <div className="app-friends-list no-scrollbar" aria-busy={loading}>
-          {loading && <ChatLoadingContent />}
+          {loading && <LoadingContent />}
           {!loading && page === 'online' && <PeopleSection title="オンライン" users={lists.online} {...sectionProps} />}
           {!loading && page === 'all' && <PeopleSection title="すべて" users={lists.all} {...sectionProps} />}
           {!loading && page === 'pending' && (

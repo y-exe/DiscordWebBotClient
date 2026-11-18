@@ -1,22 +1,7 @@
 {
   "$schema": "./node_modules/wrangler/config-schema.json",
-  "name": "discord-webclient",
+  "name": "ycord",
+  "pages_build_output_dir": "dist",
   "compatibility_date": "2026-08-08",
-  "workers_dev": false,
-  "main": ".open-next/worker.js",
-  "compatibility_flags": ["nodejs_compat"],
-  "assets": {
-    "directory": ".open-next/assets",
-    "binding": "ASSETS"
-  },
-  "routes": [
-    {
-      "pattern": "discord.yexe.xyz/*",
-      "zone_name": "yexe.xyz"
-    },
-    {
-      "pattern": "discord.yexe.net/*",
-      "zone_name": "yexe.net"
-    }
-  ]
+  "compatibility_flags": ["nodejs_compat"]
 }

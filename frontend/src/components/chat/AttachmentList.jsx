@@ -2,20 +2,7 @@ import { useEffect, useState } from 'react';
 import Symbol from '../common/Symbol';
 import { getProxyUrl } from '../../utils/helpers';
 import { safeMediaUrl } from '../../utils/security';
-
-const humanFileSize = (size) => {
-    if (!Number.isFinite(size) || size < 0) return null;
-    if (size < 1024) return `${size} B`;
-    const units = ['KB', 'MB', 'GB'];
-    let value = size;
-    let unit = 'B';
-    for (const next of units) {
-        if (value < 1024) break;
-        value /= 1024;
-        unit = next;
-    }
-    return `${value.toFixed(value < 10 ? 1 : 0)} ${unit}`;
-};
+import { humanFileSize } from './messageUtils';
 
 const attachmentKind = (attachment) => {
     const type = attachment.contentType || '';

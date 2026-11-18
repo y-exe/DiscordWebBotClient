@@ -1,6 +1,6 @@
 ﻿<div align="center">
 <h1>
-  Discord Web Token Client
+  materialcord
   
   [![discord.js-selfbot](https://img.shields.io/badge/discord.js--selfbot-5865F2?style=flat-square&logo=discord&logoColor=white)](https://github.com/youtsuhodev/discord.js-selfbot-youtsuho-v13)
   [![Next.js](https://img.shields.io/badge/Next.js-000000?style=flat-square&logo=next.js)](https://nextjs.org/)
@@ -58,9 +58,10 @@ Bot トークンおよびユーザー個人トークンにも一応対応して�
 ## ディレクトリ構造
 
 ```
-/frontend  Next.js + Tailwind CSS (ほぼMaterial3Expressive)
-/backend   Bun + Hono + Socket.io
-/docs      設計・構成・使い方のドキュメント
+/frontend      Next.js + Tailwind CSS (ほぼMaterial3Expressive) → Cloudflare Pages
+/workers/proxy backendを隠蔽する通信プロキシ → Cloudflare Workers
+/backend       Bun + Hono + Socket.io → k3s (GHCRイメージ)
+/docs          設計・構成・使い方のドキュメント
 ```
 
 ## 免責事項

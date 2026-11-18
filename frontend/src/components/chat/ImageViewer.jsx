@@ -1,105 +1,161 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { openExternalUrl, safeMediaUrl } from '../../utils/security';
-import { FaArrowDown, FaChevronLeft, FaChevronRight, FaExpand, FaUpRightFromSquare, FaXmark } from 'react-icons/fa6';
+import { FaChevronLeft, FaChevronRight } from 'react-icons/fa6';
 
 import { getProxyUrl } from '../../utils/helpers';
+import { humanFileSize } from './messageUtils';
 
+const ZOOM_STEP = 0.3;
+const MIN_SCALE = 0.1;
+const MAX_SCALE = 5;
+
+/**
+ * 画像ビュアー (for-web ImageViewerModal 仕様: スクライム+カード式ツールバー、
+ * ホイール/ドラッグでのズーム・パン)
+ */
 const ImageViewer = ({ images, initialIndex, onClose }) => {
   const [index, setIndex] = useState(initialIndex);
-  const [isLoaded, setIsLoaded] = useState(false);
+  const [prevIndex, setPrevIndex] = useState(initialIndex);
+  const [scale, setScale] = useState(1);
+  const [offset, setOffset] = useState({ x: 0, y: 0 });
+  const dragRef = useRef(null);
+
+  const items = (images || []).map((image) => (typeof image === 'string' ? { url: image } : image));
+  const current = items[index];
+
+  // 画像切替時にズーム・パンをリセット(state調整はレンダー中に行う)
+  if (prevIndex !== index) {
+    setPrevIndex(index);
+    setScale(1);
+    setOffset({ x: 0, y: 0 });
+  }
+
+  const clampScale = (value) => Math.min(MAX_SCALE, Math.max(MIN_SCALE, value));
 
   const handleNext = (e) => {
     e?.stopPropagation();
-    if (index < images.length - 1) {
-      setIndex(index + 1);
-      setIsLoaded(false);
-    }
+    if (index < items.length - 1) setIndex(index + 1);
   };
 
   const handlePrev = (e) => {
     e?.stopPropagation();
-    if (index > 0) {
-      setIndex(index - 1);
-      setIsLoaded(false);
-    }
+    if (index > 0) setIndex(index - 1);
   };
 
   useEffect(() => {
-    const handleEsc = (e) => {
+    const handleKey = (e) => {
       if (e.key === 'Escape') onClose();
       if (e.key === 'ArrowRight') handleNext();
       if (e.key === 'ArrowLeft') handlePrev();
     };
-    window.addEventListener('keydown', handleEsc);
-    return () => window.removeEventListener('keydown', handleEsc);
-  }, [index, images, onClose]);
+    window.addEventListener('keydown', handleKey);
+    return () => window.removeEventListener('keydown', handleKey);
+  });
 
-  const currentUrl = images[index];
-  const proxiedUrl = getProxyUrl(currentUrl);
+  const onWheel = (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setScale((current) => clampScale(current - e.deltaY / 1000));
+  };
+
+  const onPointerDown = (e) => {
+    if (e.button !== 0) return;
+    e.stopPropagation();
+    dragRef.current = { startX: e.clientX - offset.x, startY: e.clientY - offset.y };
+    e.currentTarget.setPointerCapture?.(e.pointerId);
+  };
+
+  const onPointerMove = (e) => {
+    if (!dragRef.current) return;
+    setOffset({ x: e.clientX - dragRef.current.startX, y: e.clientY - dragRef.current.startY });
+  };
+
+  const onPointerUp = () => {
+    dragRef.current = null;
+  };
 
   const downloadImage = (e) => {
     e.stopPropagation();
-    const safeUrl = safeMediaUrl(currentUrl);
+    const safeUrl = safeMediaUrl(current?.url);
     if (!safeUrl) return;
     const link = document.createElement('a');
     link.href = safeUrl;
-    link.download = 'image.png';
+    link.download = current?.filename || 'image';
     link.rel = 'noopener noreferrer';
     link.click();
   };
 
   return (
-    <div className="fixed inset-0 z-[1000] flex flex-col items-center justify-center bg-black/90" onClick={onClose}>
-      <div className="absolute left-0 right-0 top-0 z-[1010] flex h-14 items-center justify-between bg-gradient-to-b from-black/60 to-transparent px-6" onClick={(e) => e.stopPropagation()}>
-        <div className="text-sm font-bold text-white/80">{index + 1} / {images.length}</div>
-        <div className="flex items-center gap-3 text-white/70">
-          <md-icon-button type="button" class="m3-viewer-button" title="拡大">
-            <FaExpand size={18} />
-          </md-icon-button>
-          <md-icon-button type="button" class="m3-viewer-button" title="元画像を開く" onClick={() => openExternalUrl(currentUrl)}>
-            <FaUpRightFromSquare size={18} />
-          </md-icon-button>
-          <md-icon-button type="button" class="m3-viewer-button" title="ダウンロード" onClick={downloadImage}>
-            <FaArrowDown size={20} />
-          </md-icon-button>
-          <div className="mx-1 h-6 w-px bg-white/20" />
-          <md-icon-button type="button" class="m3-viewer-button" onClick={onClose} title="閉じる">
-            <FaXmark size={26} />
-          </md-icon-button>
+    <div className="app-image-viewer" onClick={onClose}>
+      <div className="app-image-viewer-inner">
+        <div className="app-image-viewer-bar">
+          {current?.filename ? (
+            <div className="app-viewer-card" onClick={(e) => e.stopPropagation()}>
+              <div className="app-viewer-card-text">
+                <span className="app-viewer-title">{current.filename}</span>
+                {current.size != null && <span className="app-viewer-label">{humanFileSize(current.size)}</span>}
+              </div>
+            </div>
+          ) : items.length > 1 ? (
+            <div className="app-viewer-card" onClick={(e) => e.stopPropagation()}>
+              <span className="app-viewer-title">{index + 1} / {items.length}</span>
+            </div>
+          ) : (
+            <div />
+          )}
+          <div className="app-viewer-card" onClick={(e) => e.stopPropagation()}>
+            <md-icon-button type="button" class="m3-icon-button" title="縮小" onClick={() => setScale((s) => clampScale(s - ZOOM_STEP))}>
+              zoom_out
+            </md-icon-button>
+            <md-icon-button type="button" class="m3-icon-button" title="拡大" onClick={() => setScale((s) => clampScale(s + ZOOM_STEP))}>
+              zoom_in
+            </md-icon-button>
+            <md-icon-button type="button" class="m3-icon-button" title="ダウンロード" onClick={downloadImage}>
+              download
+            </md-icon-button>
+            <md-icon-button type="button" class="m3-icon-button" title="元画像を開く" onClick={() => openExternalUrl(current?.url)}>
+              open_in_new
+            </md-icon-button>
+            <md-icon-button type="button" class="m3-icon-button" title="閉じる" onClick={onClose}>
+              close
+            </md-icon-button>
+          </div>
         </div>
-      </div>
 
-      {images.length > 1 && (
-        <>
-          <md-icon-button
-            type="button"
-            class={`m3-viewer-nav left-6 ${index === 0 ? 'opacity-0' : 'opacity-100'}`}
-            onClick={handlePrev}
-            title="前へ"
-          >
-            <FaChevronLeft size={28} />
-          </md-icon-button>
-          <md-icon-button
-            type="button"
-            class={`m3-viewer-nav right-6 ${index === images.length - 1 ? 'opacity-0' : 'opacity-100'}`}
-            onClick={handleNext}
-            title="次へ"
-          >
-            <FaChevronRight size={28} />
-          </md-icon-button>
-        </>
-      )}
+        {items.length > 1 && (
+          <>
+            <md-icon-button
+              type="button"
+              class={`m3-viewer-nav left-6 ${index === 0 ? 'opacity-0' : 'opacity-100'}`}
+              onClick={handlePrev}
+              title="前へ"
+            >
+              <FaChevronLeft size={28} />
+            </md-icon-button>
+            <md-icon-button
+              type="button"
+              class={`m3-viewer-nav right-6 ${index === items.length - 1 ? 'opacity-0' : 'opacity-100'}`}
+              onClick={handleNext}
+              title="次へ"
+            >
+              <FaChevronRight size={28} />
+            </md-icon-button>
+          </>
+        )}
 
-      <div className="animate-viewer-zoom relative flex max-h-[88vh] max-w-[92vw] select-none items-center justify-center">
         <img
-          key={currentUrl}
-          src={proxiedUrl}
-          onLoad={() => setIsLoaded(true)}
-          className={`max-h-full max-w-full object-contain shadow-2xl transition-opacity duration-300 ${isLoaded ? 'opacity-100' : 'opacity-0'}`}
-          onClick={(e) => e.stopPropagation()}
-          alt=""
+          className="app-image-viewer-image"
+          src={getProxyUrl(current?.url)}
+          alt={current?.filename || ''}
+          draggable={false}
+          style={{ transform: `translate(${offset.x}px, ${offset.y}px) scale(${scale})` }}
+          onWheel={onWheel}
+          onPointerDown={onPointerDown}
+          onPointerMove={onPointerMove}
+          onPointerUp={onPointerUp}
+          onPointerLeave={onPointerUp}
+          onContextMenu={(e) => e.stopPropagation()}
         />
-        {!isLoaded && <div className="absolute h-10 w-10 animate-spin rounded-full border-4 border-discord-primary border-t-transparent" />}
       </div>
     </div>
   );

@@ -8,7 +8,7 @@ const contentSecurityPolicy = [
   "img-src 'self' data: blob: https:",
   "media-src 'self' blob: https:",
   // 開発時はページが localhost / 127.0.0.1 のどちらで開かれてもSocket接続できるように両方を許可
-  `connect-src 'self' http://localhost:8000 ws://localhost:8000 http://127.0.0.1:8000 ws://127.0.0.1:8000 https://dapi.yexe.xyz wss://dapi.yexe.xyz https://*.google-analytics.com https://*.analytics.google.com https://*.googletagmanager.com`,
+  `connect-src 'self' http://localhost:8000 ws://localhost:8000 http://127.0.0.1:8000 ws://127.0.0.1:8000 https://materialcord.yexe.workers.dev wss://materialcord.yexe.workers.dev https://*.google-analytics.com https://*.analytics.google.com https://*.googletagmanager.com`,
   "object-src 'none'",
   "base-uri 'self'",
   "form-action 'self'",

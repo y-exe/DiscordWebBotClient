@@ -2,6 +2,20 @@
 
 export const isReadableChannel = (channel) => !['GUILD_VOICE', 'GUILD_STAGE_VOICE', 2, 13].includes(channel.type);
 
+export const humanFileSize = (size) => {
+    if (!Number.isFinite(size) || size < 0) return null;
+    if (size < 1024) return `${size} B`;
+    const units = ['KB', 'MB', 'GB'];
+    let value = size;
+    let unit = 'B';
+    for (const next of units) {
+        if (value < 1024) break;
+        value /= 1024;
+        unit = next;
+    }
+    return `${value.toFixed(value < 10 ? 1 : 0)} ${unit}`;
+};
+
 export const lastChannelKey = (guildId) => `discord-last-channel:${guildId}`;
 
 const DATE_LABEL_FORMAT = new Intl.DateTimeFormat('ja-JP', { year: 'numeric', month: 'long', day: 'numeric' });

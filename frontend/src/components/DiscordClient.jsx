@@ -18,7 +18,7 @@ import ForumView from './chat/ForumView';
 import FriendsView from './home/FriendsView';
 import HomeView from './home/HomeView';
 import ImageViewer from './chat/ImageViewer';
-import ChatLoadingContent from './chat/ChatLoadingContent';
+import LoadingContent from './chat/LoadingContent';
 import UserPopout from './overlay/UserPopout';
 import MediaPicker from './chat/MediaPicker';
 import ModalDialog from './chat/ModalDialog';
@@ -932,7 +932,6 @@ const [groupMemberTarget, setGroupMemberTarget] = useState(null); // { channel }
                         onEmptyContextMenu={(event) => {
                             event.preventDefault();
                             if (!canManageChannels) return;
-                            // ServerSidebarContextMenu
                             setActionMenu({
                                 x: event.clientX,
                                 y: event.clientY,
@@ -949,7 +948,7 @@ const [groupMemberTarget, setGroupMemberTarget] = useState(null); // { channel }
 
                 <div ref={contentShellRef} className={`app-content-shell ${showMobileChat ? 'flex' : 'hidden md:flex'}`}>
                     {isFriendsRoute ? (
-                        friendsLoading ? <ChatLoadingContent /> : (
+                        friendsLoading ? <LoadingContent /> : (
                             <FriendsView
                                 friends={friends}
                                 onUserClick={openUserPopout}
@@ -1087,7 +1086,7 @@ const [groupMemberTarget, setGroupMemberTarget] = useState(null); // { channel }
                                   <div className="app-chat-body">
                                     <div className="app-chat-main">
                                     <div ref={scrollRef} onScroll={handleScroll} className="app-messages no-scrollbar" data-loading={isChannelLoading ? 'true' : 'false'} aria-busy={isChannelLoading}>
-                                        {isChannelLoading ? <ChatLoadingContent /> : <>
+                                        {isChannelLoading ? <LoadingContent /> : <>
                                         <div className="flex select-none flex-col mx-4 mt-[18px] mb-2.5 text-[var(--app-on-surface)]">
                                             <h1 className="m-0 text-[32px] leading-[1.15] font-[650]">{currentChannel?.name || '会話'}</h1>
                                             <p className="mt-1.5 mb-0 text-[var(--app-on-surface-variant)] text-base font-medium">これが会話の始まりです。</p>
@@ -1333,9 +1332,9 @@ const [groupMemberTarget, setGroupMemberTarget] = useState(null); // { channel }
                             ) : (
                                 loadingChannels ? (paramGuildId === '@me'
                                     ? <div className="app-workspace-progress" role="status" aria-label="ホームを読み込み中"><md-linear-progress indeterminate /></div>
-                                    : <ChatLoadingContent />) :
+                                    : <LoadingContent />) :
                                 paramGuildId !== '@me' && !isDesktop ? <div className="flex-1" /> :
-                                paramGuildId !== '@me' && isDesktop && hasReadableChannels ? <ChatLoadingContent /> :
+                                paramGuildId !== '@me' && isDesktop && hasReadableChannels ? <LoadingContent /> :
                                 <div className="grid flex-1 place-items-center px-6 text-center">
                                     <div className="max-w-sm">
                                         <div className="mx-auto mb-5 grid h-16 w-16 place-items-center rounded-[var(--app-radius-xl)] bg-[var(--app-surface-container-high)] text-[var(--app-outline)]">

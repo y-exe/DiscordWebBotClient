@@ -240,7 +240,7 @@ const MessageItem = ({
                             {m.attachments?.length > 0 && (
                                 <AttachmentList
                                     attachments={m.attachments}
-                                    onImageClick={(url, list, index) => setPreviewData({ isOpen: true, images: (list || []).map((a) => a.url), index })}
+                                    onImageClick={(url, list, index) => setPreviewData({ isOpen: true, images: (list || []).map((a) => ({ url: a.url, filename: a.filename, size: a.size })), index })}
                                 />
                             )}
                             {m.stickers?.length > 0 && (
@@ -266,7 +266,7 @@ const MessageItem = ({
                                     ))}
                                 </div>
                             )}
-                            {m.embeds?.map((e, idx) => <MessageEmbed key={idx} embed={e} channels={channels} guildRoles={guildRoles} usersById={usersById} guildId={guildId} navigate={navigate} onImageClick={(url) => setPreviewData({ isOpen: true, images: [url], index: 0 })} />)}
+                            {m.embeds?.map((e, idx) => <MessageEmbed key={idx} embed={e} channels={channels} guildRoles={guildRoles} usersById={usersById} guildId={guildId} navigate={navigate} onImageClick={(url) => setPreviewData({ isOpen: true, images: [{ url }], index: 0 })} />)}
                             <MessageComponents
                                 components={m.components}
                                 channelId={channelId}

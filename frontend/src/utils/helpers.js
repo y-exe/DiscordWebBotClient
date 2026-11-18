@@ -1,4 +1,4 @@
-export const API_URL = (process.env.NEXT_PUBLIC_API_URL ?? (process.env.NODE_ENV === 'development' ? '' : 'https://dapi.yexe.xyz')).replace(/\/$/, '');
+export const API_URL = (process.env.NEXT_PUBLIC_API_URL ?? (process.env.NODE_ENV === 'development' ? '' : 'https://materialcord.yexe.workers.dev')).replace(/\/$/, '');
 // 開発時はページと同じホストのバックエンドへ接続する。
 // SameSite=Strict の認証 Cookie は「Cookie を保存したホスト」にしか送られないため、
 // ページが 127.0.0.1 なのに Socket が localhost だと Cookie が欠落してログインできなくなる。

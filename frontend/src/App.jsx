@@ -3,8 +3,8 @@ import React, { useState, useEffect, Suspense, lazy } from 'react';
 import { useNavigate, useLocation } from './utils/navigation';
 import { io } from 'socket.io-client';
 import { SOCKET_URL } from './utils/helpers';
-import ChatLoadingContent from './components/chat/ChatLoadingContent';
-import SidebarLoadingContent from './components/channel/SidebarLoadingContent';
+import ChatLoading from './components/chat/LoadingContent';
+import SidebarLoading from './components/channel/LoadingContent';
 import {
   clearPendingLogin,
   commitPendingLogin,
@@ -27,14 +27,14 @@ const DiscordLoadingShell = () => {
       </div>
       <div className="app-sidebar" aria-hidden="true">
         {!isHome && <div className="app-sidebar-header"><span className="h-5 w-3/4 animate-pulse rounded-md bg-[var(--app-surface-container-high)]" /></div>}
-        <div className="app-sidebar-scroll no-scrollbar"><SidebarLoadingContent isDMList={isHome} showTop={isHome} /></div>
+        <div className="app-sidebar-scroll no-scrollbar"><SidebarLoading isDMList={isHome} showTop={isHome} /></div>
       </div>
       <div className="app-content-shell">
         <main className="app-chat">
           <header className="app-chat-header" aria-hidden="true">
             {!isHome && <span className="h-5 w-40 animate-pulse rounded-md bg-[var(--app-surface-container-high)]" />}
           </header>
-          {isHome ? <div className="app-workspace-progress" role="status" aria-label="ホームを読み込み中"><md-linear-progress indeterminate /></div> : <ChatLoadingContent />}
+          {isHome ? <div className="app-workspace-progress" role="status" aria-label="ホームを読み込み中"><md-linear-progress indeterminate /></div> : <ChatLoading />}
         </main>
       </div>
     </div>

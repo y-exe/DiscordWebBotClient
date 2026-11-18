@@ -8,8 +8,8 @@ const menuItems = [
     { 
         title: "Project", 
         links: [
-            { text: "GitHub", url: "https://github.com/y-exe/discord-token-webclient", isExternal: true, desc: "ソースコードを閲覧" }, 
-            { text: "Commitlog", url: "https://github.com/y-exe/discord-token-webclient/commits/main/", isExternal: true, desc: "更新履歴を確認" }
+            { text: "GitHub", url: "https://github.com/y-exe/MaterialCord", isExternal: true, desc: "ソースコードを閲覧" }, 
+            { text: "Commitlog", url: "https://github.com/y-exe/MaterialCord/commits/main/", isExternal: true, desc: "更新履歴を確認" }
         ] 
     },
     { 
@@ -72,7 +72,7 @@ export default function Header() {
                 </div>
                 <div className="flex items-center gap-4">
                     <ToggleTheme />
-                    <a href="https://github.com/y-exe/discord-token-webclient" target="_blank" rel="noopener noreferrer" className="text-gray-700 dark:text-gray-300 hover:text-black dark:hover:text-white transition-colors"><FaGithub size={24} /></a>
+                    <a href="https://github.com/y-exe/MaterialCord" target="_blank" rel="noopener noreferrer" className="text-gray-700 dark:text-gray-300 hover:text-black dark:hover:text-white transition-colors"><FaGithub size={24} /></a>
                 </div>
             </div>
         </header>
