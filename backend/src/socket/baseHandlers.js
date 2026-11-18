@@ -3,6 +3,7 @@ const {
     cleanText,
     publicError,
     safeAck,
+    isPlainObject,
     parseAttachment,
     discordFetch,
     snowflakeToTimestamp,
@@ -21,6 +22,7 @@ const {
 } = require('../services/formatter');
 const { sessions } = require('../services/session');
 const { getDMChannels, getFriends, getChannelsWithMembers } = require('../services/discord');
+const { getRawMessage } = require('./discordEvents');
 
 const mapCommandOptions = (options = []) =>
     options.map((opt) => ({

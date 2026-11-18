@@ -53,11 +53,15 @@ const readJsonBody = async (c) => {
     }
 };
 
+// 本番は Pages (ycord.pages.dev) と Workers プロキシ (materialcord.yexe.workers.dev) が
+// クロスサイトになるため None が必須 (secure 付き)。CSRF は Origin 許可リストで防ぐ。
+const COOKIE_SAME_SITE = IS_PRODUCTION ? 'None' : 'Strict';
+
 const setAuthCookie = (c, name, value, maxAgeMs) => {
     setCookie(c, name, value, {
         httpOnly: true,
         secure: IS_PRODUCTION,
-        sameSite: 'Strict',
+        sameSite: COOKIE_SAME_SITE,
         path: '/',
         maxAge: Math.floor(maxAgeMs / 1000)
     });
@@ -66,7 +70,7 @@ const setAuthCookie = (c, name, value, maxAgeMs) => {
 const clearAuthCookie = (c, name) => {
     deleteCookie(c, name, {
         secure: IS_PRODUCTION,
-        sameSite: 'Strict',
+        sameSite: COOKIE_SAME_SITE,
         path: '/'
     });
 };

@@ -30,6 +30,8 @@ app.use(cors({
     maxAge: 86400
 }));
 
+app.get('/healthz', (c) => c.text('ok'));
+
 app.route('/api/auth', authApp);
 app.route('/api/image-proxy', proxyApp);
 
