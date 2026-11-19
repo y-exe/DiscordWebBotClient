@@ -1,0 +1,25 @@
+version: 2
+updates:
+  # フロントエンド (npm + package-lock.json)
+  - package-ecosystem: npm
+    directory: /frontend
+    schedule:
+      interval: weekly
+      day: saturday
+      time: "09:00"
+      timezone: Asia/Tokyo
+    groups:
+      # minor/patch は 1 PR にまとめる (major は個別 PR)
+      minor-and-patch:
+        update-types:
+          - minor
+          - patch
+
+  # GitHub Actions のバージョン更新
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+      day: saturday
+      time: "09:00"
+      timezone: Asia/Tokyo
