@@ -10,7 +10,7 @@ ycord.pages.dev (Cloudflare Pages / Next.js)
 materialcord.yexe.workers.dev (Workers プロキシ: backend を隠蔽)
    │
    ▼
-dapi.yexe.xyz (VPS nginx → k3s discord-xyz-backend / Hono :8000)
+dapi.yexe.xyz (VPS nginx → k3s materialcord / Hono :8000)
    │  REST / Gateway (discord.js-selfbot / discord.js)
    ▼
 Discord API

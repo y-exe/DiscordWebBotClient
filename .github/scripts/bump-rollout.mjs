@@ -1,5 +1,5 @@
 // GitOps マニフェストの restartedAt アノテーションを更新して Argo のロールアウトを誘発する。
-// 使い方: node bump-rollout.mjs apps/discord-xyz-backend/app.yaml
+// 使い方: node bump-rollout.mjs apps/materialcord/app.yaml
 import { readFileSync, writeFileSync } from 'node:fs';
 
 const file = process.argv[2];

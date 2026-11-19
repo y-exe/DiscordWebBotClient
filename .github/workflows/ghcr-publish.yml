@@ -1,4 +1,4 @@
-name: Build and Push discord-xyz-backend to GHCR
+name: Build and Push materialcord-backend to GHCR
 
 on:
   push:
@@ -86,9 +86,9 @@ jobs:
           fi
           git clone --depth 1 https://x-access-token:${VPS_GITOPS_TOKEN}@github.com/y-exe/vps.git vps
           cd vps
-          node "$GITHUB_WORKSPACE/.github/scripts/bump-rollout.mjs" apps/discord-xyz-backend/app.yaml
+          node "$GITHUB_WORKSPACE/.github/scripts/bump-rollout.mjs" apps/materialcord/app.yaml
           git config user.name "materialcord-deploy"
           git config user.email "actions@users.noreply.github.com"
-          git add apps/discord-xyz-backend/app.yaml
-          git commit -m "chore: discord-xyz-backendを再ロールアウト (${GITHUB_SHA::7})"
+          git add apps/materialcord/app.yaml
+          git commit -m "chore: materialcordを再ロールアウト (${GITHUB_SHA::7})"
           git push
