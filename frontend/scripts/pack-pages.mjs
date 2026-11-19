@@ -28,13 +28,33 @@ for (const entry of ['.build', 'cache', 'cloudflare', 'middleware', 'server-func
 }
 
 // require シムを最優先で読み込むラッパーエントリ
+// (Pages advanced mode は worker 優先のため、静的アセットは env.ASSETS から配信する)
 writeFileSync(
   path.join(workerDir, 'shim.mjs'),
   "import { createRequire } from 'node:module';\n\nif (typeof globalThis.require === 'undefined') {\n  globalThis.require = createRequire('file:///worker/shim.mjs');\n}\n",
 );
 writeFileSync(
   path.join(workerDir, 'index.js'),
-  "import './shim.mjs';\nexport { default } from './worker.js';\nexport * from './worker.js';\n",
+  [
+    "import './shim.mjs';",
+    "import worker from './worker.js';",
+    '',
+    'const API_PREFIXES = ["/api/", "/socket.io/"];',
+    '',
+    'export default {',
+    '  async fetch(request, env, ctx) {',
+    '    const url = new URL(request.url);',
+    '    const isApi = url.pathname === "/healthz" || API_PREFIXES.some((prefix) => url.pathname.startsWith(prefix));',
+    "    if (!isApi && (request.method === 'GET' || request.method === 'HEAD') && env.ASSETS) {",
+    '      const asset = await env.ASSETS.fetch(request);',
+    '      if (asset && asset.status !== 404) return asset;',
+    '    }',
+    '    return worker.fetch(request, env, ctx);',
+    '  },',
+    '};',
+    "export * from './worker.js';",
+    '',
+  ].join('\n'),
 );
 
 // 静的アセット (_headers を含む) は dist 直下
