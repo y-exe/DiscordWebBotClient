@@ -52,7 +52,7 @@ jobs:
         id: meta
         uses: docker/metadata-action@v5
         with:
-          images: ${{ env.REGISTRY }}/${{ github.repository_owner }}/discord-xyz-backend
+          images: ${{ env.REGISTRY }}/${{ github.repository_owner }}/materialcord-backend
           tags: |
             type=raw,value=latest
             type=sha,format=short

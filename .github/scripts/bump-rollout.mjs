@@ -14,7 +14,7 @@ let yaml = readFileSync(file, 'utf8');
 if (yaml.includes('kubectl.kubernetes.io/restartedAt')) {
   yaml = yaml.replace(/kubectl\.kubernetes\.io\/restartedAt: '.*'/, `kubectl.kubernetes.io/restartedAt: '${stamp}'`);
 } else {
-  const anchor = /([ \t]+labels:\n[ \t]+app: discord-xyz-backend\n)([ \t]+spec:)/;
+  const anchor = /([ \t]+labels:\n[ \t]+app: materialcord\n)([ \t]+spec:)/;
   if (!anchor.test(yaml)) {
     console.error('insertion point not found');
     process.exit(1);
