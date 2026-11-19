@@ -2,6 +2,7 @@
   "name": "materialcord-proxy",
   "private": true,
   "scripts": {
+    "build": "echo 'proxy: nothing to build'",
     "deploy": "wrangler deploy"
   },
   "devDependencies": {
