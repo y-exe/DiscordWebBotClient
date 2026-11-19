@@ -77,10 +77,13 @@ jobs:
       contents: read
     steps:
       - name: Bump restartedAt in GitOps repo
-        if: ${{ secrets.VPS_GITOPS_TOKEN != '' }}
         env:
           VPS_GITOPS_TOKEN: ${{ secrets.VPS_GITOPS_TOKEN }}
         run: |
+          if [ -z "$VPS_GITOPS_TOKEN" ]; then
+            echo "VPS_GITOPS_TOKEN is not set; skipping GitOps rollout."
+            exit 0
+          fi
           git clone --depth 1 https://x-access-token:${VPS_GITOPS_TOKEN}@github.com/y-exe/vps.git vps
           cd vps
           node "$GITHUB_WORKSPACE/.github/scripts/bump-rollout.mjs" apps/discord-xyz-backend/app.yaml
