@@ -36,7 +36,7 @@
     "twemoji": "^14.0.2"
   },
   "devDependencies": {
-    "@eslint/js": "^9.39.1",
+    "@eslint/js": "^10.0.1",
     "@material/material-color-utilities": "^0.3.0",
     "@types/react": "^19.2.5",
     "@types/react-dom": "^19.2.3",
