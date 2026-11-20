@@ -1,8 +1,10 @@
 // OpenNext (Cloudflare Workers) の出力を Cloudflare Pages (advanced mode) 用に梱包する。
 // dist/_worker.js/ にワーカーモジュール一式、dist/ 直下に静的アセットを展開する。
 //
-// Next 16 の CJS モジュール (dev/browser-logs/file-logger.js など) がバンドル内に
-// 生の require を残すため、エントリの先頭で globalThis.require を用意する。
+// ラッパーエントリ (index.js) は:
+// - /api/* と /socket.io/* を upstream (backend) へプロキシ (クッキーをファーストパーティ化)
+// - 静的アセットは env.ASSETS から配信
+// - それ以外は OpenNext ワーカー (SSR)
 import { copyFileSync, cpSync, existsSync, mkdirSync, rmSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -27,28 +29,79 @@ for (const entry of ['.build', 'cache', 'cloudflare', 'middleware', 'server-func
   cpSync(source, path.join(workerDir, entry), { recursive: true });
 }
 
-// require シムを最優先で読み込むラッパーエントリ
-// (Pages advanced mode は worker 優先のため、静的アセットは env.ASSETS から配信する)
+// require シム + APIプロキシ + アセット配信ラッパー
 writeFileSync(
   path.join(workerDir, 'shim.mjs'),
-  "import { createRequire } from 'node:module';\n\nif (typeof globalThis.require === 'undefined') {\n  globalThis.require = createRequire('file:///worker/shim.mjs');\n}\n",
+  [
+    "import { createRequire } from 'node:module';",
+    '',
+    "if (typeof globalThis.require === 'undefined') {",
+    "  globalThis.require = createRequire('file:///worker/shim.mjs');",
+    '}',
+    '',
+  ].join('\n'),
 );
+
 writeFileSync(
   path.join(workerDir, 'index.js'),
   [
     "import './shim.mjs';",
     "import worker from './worker.js';",
     '',
-    'const API_PREFIXES = ["/api/", "/socket.io/"];',
+    "const API_PREFIXES = ['/api/', '/socket.io/'];",
+    "const HOP_BY_HOP_HEADERS = new Set(['connection', 'keep-alive', 'proxy-authenticate', 'proxy-authorization', 'te', 'trailer', 'transfer-encoding', 'upgrade']);",
+    '',
+    'function isApiPath(pathname) {',
+    "  return pathname === '/healthz' || API_PREFIXES.some((prefix) => pathname.startsWith(prefix));",
+    '}',
+    '',
+    'function toUpstreamRequest(request, upstreamOrigin) {',
+    '  const incomingUrl = new URL(request.url);',
+    '  const isWebSocket = request.headers.get("upgrade")?.toLowerCase() === "websocket";',
+    '  const headers = new Headers(request.headers);',
+    '  for (const header of HOP_BY_HOP_HEADERS) {',
+    '    if (isWebSocket && (header === "connection" || header === "upgrade")) continue;',
+    '    headers.delete(header);',
+    '  }',
+    '  headers.delete("host");',
+    '  headers.set("x-forwarded-host", incomingUrl.host);',
+    '  headers.set("x-forwarded-proto", incomingUrl.protocol.slice(0, -1));',
+    '  const upstreamUrl = new URL(incomingUrl.pathname + incomingUrl.search, upstreamOrigin);',
+    '  return {',
+    '    upstreamRequest: new Request(upstreamUrl.toString(), {',
+    '      method: request.method,',
+    '      headers,',
+    '      body: request.method === "GET" || request.method === "HEAD" ? undefined : request.body,',
+    '      redirect: "manual",',
+    '    }),',
+    '    isWebSocket,',
+    '  };',
+    '}',
     '',
     'export default {',
     '  async fetch(request, env, ctx) {',
     '    const url = new URL(request.url);',
-    '    const isApi = url.pathname === "/healthz" || API_PREFIXES.some((prefix) => url.pathname.startsWith(prefix));',
-    "    if (!isApi && (request.method === 'GET' || request.method === 'HEAD') && env.ASSETS) {",
+    '',
+    '    // backend プロキシ (クッキーを ycord.pages.dev のファーストパーティとして保持)',
+    '    if (isApiPath(url.pathname)) {',
+    '      const upstreamOrigin = env.UPSTREAM_ORIGIN;',
+    '      if (!upstreamOrigin) return new Response("UPSTREAM_ORIGIN is not configured.", { status: 500 });',
+    '      const { upstreamRequest, isWebSocket } = toUpstreamRequest(request, upstreamOrigin);',
+    '      const response = await fetch(upstreamRequest);',
+    '      if (isWebSocket) return response;',
+    '      const headers = new Headers(response.headers);',
+    '      headers.delete("server");',
+    '      headers.delete("x-powered-by");',
+    '      return new Response(response.body, { status: response.status, statusText: response.statusText, headers });',
+    '    }',
+    '',
+    '    // 静的アセット (Pages のアセットマニフェストから配信)',
+    "    if ((request.method === 'GET' || request.method === 'HEAD') && env.ASSETS) {",
     '      const asset = await env.ASSETS.fetch(request);',
     '      if (asset && asset.status !== 404) return asset;',
     '    }',
+    '',
+    '    // SSR / 動的ルート',
     '    return worker.fetch(request, env, ctx);',
     '  },',
     '};',

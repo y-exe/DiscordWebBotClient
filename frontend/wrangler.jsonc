@@ -3,5 +3,8 @@
   "name": "ycord",
   "pages_build_output_dir": "dist",
   "compatibility_date": "2026-08-08",
-  "compatibility_flags": ["nodejs_compat"]
+  "compatibility_flags": ["nodejs_compat"],
+  "vars": {
+    "UPSTREAM_ORIGIN": "https://dapi.yexe.xyz"
+  }
 }

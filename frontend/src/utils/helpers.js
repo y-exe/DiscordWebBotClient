@@ -1,9 +1,14 @@
-export const API_URL = (process.env.NEXT_PUBLIC_API_URL ?? (process.env.NODE_ENV === 'development' ? '' : 'https://materialcord.yexe.workers.dev')).replace(/\/$/, '');
+// 本番は同一オリジン (Pages worker が /api と /socket.io を backend にプロキシする)。
+// クッキーをファーストパーティとして保持するため、別オリジンのAPI URLは使わない。
+export const API_URL = (process.env.NEXT_PUBLIC_API_URL ?? '').replace(/\/$/, '');
 // 開発時はページと同じホストのバックエンドへ接続する。
 // SameSite=Strict の認証 Cookie は「Cookie を保存したホスト」にしか送られないため、
 // ページが 127.0.0.1 なのに Socket が localhost だと Cookie が欠落してログインできなくなる。
 const DEV_SOCKET_HOST = typeof window !== 'undefined' ? window.location.hostname : 'localhost';
-export const SOCKET_URL = process.env.NEXT_PUBLIC_SOCKET_URL ?? (process.env.NODE_ENV === 'development' ? `http://${DEV_SOCKET_HOST}:8000` : API_URL);
+export const SOCKET_URL = process.env.NEXT_PUBLIC_SOCKET_URL
+  ?? (process.env.NODE_ENV === 'development'
+    ? `http://${DEV_SOCKET_HOST}:8000`
+    : (typeof window !== 'undefined' ? window.location.origin : ''));
 
 const PROXY_IMAGE_HOSTS = new Set([
   'cdn.discordapp.com',
